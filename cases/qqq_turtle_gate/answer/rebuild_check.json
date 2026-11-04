@@ -1,0 +1,49 @@
+{
+  "official": {
+    "final_equity": 65476.19,
+    "total_return": -0.345238,
+    "mdd": -0.424577,
+    "mdd_date": "2026-04-10",
+    "buy_hold_return": 1.265737,
+    "fees": 217.56,
+    "fills": 331,
+    "rounds": 77,
+    "closed_rounds": 76,
+    "open_shares": -87,
+    "first_date": "2021-01-04",
+    "last_date": "2026-10-30",
+    "days": 1464,
+    "reasons": {
+      "add": 137,
+      "stop": 74,
+      "entry20": 57,
+      "exit10": 23,
+      "entry55": 20,
+      "gap_stop": 9,
+      "gap_exit10": 7,
+      "stop_same_day": 4
+    }
+  },
+  "intern": {
+    "final_equity": 117402.57,
+    "total_return": 0.174026,
+    "mdd": -0.118442,
+    "mdd_date": "2026-02-25",
+    "buy_hold_return": 1.265737,
+    "fees": 0.0,
+    "fills": 93,
+    "rounds": 47,
+    "closed_rounds": 46,
+    "open_shares": -119,
+    "first_date": "2021-01-04",
+    "last_date": "2026-10-30",
+    "days": 1464,
+    "reasons": {
+      "entry20_close": 47,
+      "exit10_close": 46
+    }
+  },
+  "daily_rows": 1717,
+  "daily_first": "2020-01-02",
+  "daily_last": "2026-10-30"
+}
