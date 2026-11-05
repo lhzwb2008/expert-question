@@ -1,8 +1,12 @@
 # 出题底稿
 
-飞书高经济价值出题的本地底稿。已经做完材料的题放在 `cases/`。现在只有一道，后续新题按它的顺序另开目录。
+飞书高经济价值出题的本地底稿。已经做完材料的题放在 `cases/`。后续新题按参考案例的顺序另开目录。
 
 参考案例：[cases/qqq_turtle_gate](cases/qqq_turtle_gate/README.md)
+
+第二题：[cases/prop_account_choice](cases/prop_account_choice/README.md)，自营考试账户二选一。
+
+第三题：[cases/au_lunch_gate](cases/au_lunch_gate/README.md)，沪金午休跟随是否上实盘。
 
 下一题从这里开始：
 
