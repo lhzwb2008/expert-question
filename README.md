@@ -8,6 +8,12 @@
 
 第三题：[cases/au_lunch_gate](cases/au_lunch_gate/README.md)，沪金午休跟随是否上实盘。
 
+第四题：[cases/fx_news_window](cases/fx_news_window/README.md)，GBP/USD 新闻过滤方案选择。
+
+第五题：[cases/carry_screen](cases/carry_screen/README.md)，商品跨期价差品种准入。
+
+第六题：[cases/ah_hsi_gate](cases/ah_hsi_gate/README.md)，恒生成份股调整交易是否开展。
+
 出题口径以参考案例为准。2026-11-06 确认：满分 100 分，豆包 2.1 Pro 得分不超过 50；考点拆成 3 到 6 个维度，加总 100，每维 3 到 4 个可核对的等级，并写明易错点。标答文字要写裁定理由。细节在参考案例的「平台要求」「考点怎么写」「注意事项」。
 
 下一题从这里开始：

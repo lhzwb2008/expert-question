@@ -1,0 +1,82 @@
+{
+  "events": 71,
+  "events_by_type": {
+    "美国非农": 21,
+    "美国CPI": 21,
+    "FOMC声明": 15,
+    "英国央行利率决议": 14
+  },
+  "configs": {
+    "A": {
+      "trades": 96,
+      "net_pnl": -6906.0,
+      "violations": 3,
+      "open_viol": 1,
+      "close_viol": 2,
+      "deducted": 0.0,
+      "terminated": "2025-06-11 12:30",
+      "withdrawable": -6906.0,
+      "wins": 44,
+      "skips": {
+        "区间宽度不符": 34,
+        "区间K线不足": 1,
+        "无信号": 1
+      },
+      "trades_before_settle": 440
+    },
+    "B": {
+      "trades": 111,
+      "net_pnl": -8520.0,
+      "violations": 3,
+      "open_viol": 0,
+      "close_viol": 3,
+      "deducted": 0.0,
+      "terminated": "2025-07-03 12:30",
+      "withdrawable": -8520.0,
+      "wins": 51,
+      "skips": {
+        "区间宽度不符": 34,
+        "区间K线不足": 1,
+        "无信号": 1
+      },
+      "trades_before_settle": 440
+    },
+    "C": {
+      "trades": 440,
+      "net_pnl": -30090.0,
+      "violations": 0,
+      "open_viol": 0,
+      "close_viol": 0,
+      "deducted": 0.0,
+      "terminated": null,
+      "withdrawable": -30090.0,
+      "wins": 212,
+      "skips": {
+        "区间宽度不符": 34,
+        "区间K线不足": 1,
+        "无信号": 1
+      },
+      "trades_before_settle": 440
+    },
+    "D": {
+      "trades": 374,
+      "net_pnl": -28491.0,
+      "violations": 0,
+      "open_viol": 0,
+      "close_viol": 0,
+      "deducted": 0.0,
+      "terminated": null,
+      "withdrawable": -28491.0,
+      "wins": 178,
+      "skips": {
+        "区间宽度不符": 30,
+        "事件日停机": 70,
+        "区间K线不足": 1,
+        "无信号": 1
+      },
+      "trades_before_settle": 374
+    }
+  },
+  "pick": "D",
+  "trading_days": 476
+}

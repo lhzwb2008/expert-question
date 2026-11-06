@@ -1,0 +1,35 @@
+{
+  "decision": "不开展",
+  "windows": [
+    {
+      "n": 1,
+      "trades": 15,
+      "total": -0.00645006709951218,
+      "wins": 6,
+      "worst_name": "海爾智家",
+      "worst_date": "2022-12-05",
+      "worst_pnl": -0.019667135075651872,
+      "pass": false
+    },
+    {
+      "n": 5,
+      "trades": 15,
+      "total": 0.03369875672492887,
+      "wins": 8,
+      "worst_name": "寧德時代",
+      "worst_date": "2026-03-09",
+      "worst_pnl": -0.08975106063584071,
+      "pass": false
+    },
+    {
+      "n": 10,
+      "trades": 15,
+      "total": -0.07888409695413054,
+      "wins": 7,
+      "worst_name": "寧德時代",
+      "worst_date": "2026-03-09",
+      "worst_pnl": -0.19882015493362815,
+      "pass": false
+    }
+  ]
+}
