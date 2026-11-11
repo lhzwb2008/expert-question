@@ -1,0 +1,45 @@
+{
+  "choice": "A",
+  "rows": [
+    {
+      "model": "A",
+      "name": "历史模拟法",
+      "days": 1464,
+      "exceptions": 16,
+      "lr": 0.12387538742814286,
+      "max_in_250": 8,
+      "avg_var_pct": 1.837470449132516,
+      "pass": true
+    },
+    {
+      "model": "B",
+      "name": "正态法",
+      "days": 1464,
+      "exceptions": 27,
+      "lr": 8.437991083431342,
+      "max_in_250": 14,
+      "avg_var_pct": 1.5262670265481693,
+      "pass": false
+    },
+    {
+      "model": "C",
+      "name": "指数加权法",
+      "days": 1464,
+      "exceptions": 24,
+      "lr": 5.066801085707112,
+      "max_in_250": 7,
+      "avg_var_pct": 1.4144896228965176,
+      "pass": false
+    },
+    {
+      "model": "D",
+      "name": "波动率调整历史模拟法",
+      "days": 1464,
+      "exceptions": 14,
+      "lr": 0.028677556206275767,
+      "max_in_250": 5,
+      "avg_var_pct": 1.87683048200965,
+      "pass": true
+    }
+  ]
+}

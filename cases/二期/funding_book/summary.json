@@ -1,0 +1,45 @@
+{
+  "choice": "ETHUSDT",
+  "rows": [
+    {
+      "symbol": "BTCUSDT",
+      "net": 1303.5045843567066,
+      "entries": 30,
+      "collected": 1966,
+      "max_dd": 273.4066164593082,
+      "pass": true
+    },
+    {
+      "symbol": "ETHUSDT",
+      "net": 1419.8124225431761,
+      "entries": 26,
+      "collected": 1838,
+      "max_dd": 286.8346396501681,
+      "pass": true
+    },
+    {
+      "symbol": "SOLUSDT",
+      "net": 960.3300056256609,
+      "entries": 36,
+      "collected": 1314,
+      "max_dd": 620.3432083437103,
+      "pass": false
+    },
+    {
+      "symbol": "DOGEUSDT",
+      "net": 1621.6348786423061,
+      "entries": 52,
+      "collected": 1702,
+      "max_dd": 855.9997947400286,
+      "pass": false
+    },
+    {
+      "symbol": "WIFUSDT",
+      "net": 920.9182335040017,
+      "entries": 46,
+      "collected": 1937,
+      "max_dd": 466.4740804019709,
+      "pass": false
+    }
+  ]
+}

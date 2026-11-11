@@ -1,0 +1,5 @@
+algo,name,days,mean_vs_vwap_bp,std_vs_vwap_bp,worst_vs_vwap_bp,mean_vs_arrival_bp,pass
+TWAP,匀速,61,0.45,6.96,17.61,15.83,是
+VWAP,按成交量分布,61,-0.67,6.54,13.12,14.65,是
+POV,跟量,61,-6.97,40.84,89.44,8.12,否
+AM,上午完成,61,-2.76,22.34,52.36,12.53,否

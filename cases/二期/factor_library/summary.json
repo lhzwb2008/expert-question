@@ -1,0 +1,62 @@
+{
+  "admitted": [
+    "F3"
+  ],
+  "rows": [
+    {
+      "factor": "F1",
+      "name": "动量",
+      "months": 70,
+      "ic_mean": 0.01736593391714561,
+      "ic_t": 0.507021312847361,
+      "ic_pos_months": 41,
+      "ls_gross_pct": 0.23407411033710165,
+      "ls_net_pct": 0.1397883960513875,
+      "pass": false
+    },
+    {
+      "factor": "F2",
+      "name": "反转",
+      "months": 70,
+      "ic_mean": -0.01166479523686016,
+      "ic_t": -0.39647143944957086,
+      "ic_pos_months": 29,
+      "ls_gross_pct": -0.2976459074955582,
+      "ls_net_pct": -0.5957411455907963,
+      "pass": false
+    },
+    {
+      "factor": "F3",
+      "name": "低波动",
+      "months": 70,
+      "ic_mean": 0.07214112162570956,
+      "ic_t": 2.1410348713097966,
+      "ic_pos_months": 38,
+      "ls_gross_pct": 0.9757492801714633,
+      "ls_net_pct": 0.888368327790511,
+      "pass": true
+    },
+    {
+      "factor": "F4",
+      "name": "52周高点",
+      "months": 70,
+      "ic_mean": 0.039448577038240513,
+      "ic_t": 1.194917617508437,
+      "ic_pos_months": 43,
+      "ls_gross_pct": 0.28374722273320696,
+      "ls_net_pct": 0.1546996036855878,
+      "pass": false
+    },
+    {
+      "factor": "F5",
+      "name": "彩票",
+      "months": 70,
+      "ic_mean": 0.032155051939909904,
+      "ic_t": 1.1568809023202327,
+      "ic_pos_months": 40,
+      "ls_gross_pct": -0.23064687285277202,
+      "ls_net_pct": -0.4630278252337244,
+      "pass": false
+    }
+  ]
+}

@@ -3,5 +3,5 @@
 .env.*
 __pycache__/
 *.pyc
-cases/*/selftest/
+cases/**/selftest/
 RSI-*.pdf

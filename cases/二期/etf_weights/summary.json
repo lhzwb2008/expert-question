@@ -1,0 +1,49 @@
+{
+  "choice": "D",
+  "rows": [
+    {
+      "scheme": "E",
+      "name": "等权",
+      "months": 70,
+      "final_nav": 1.2659689079949767,
+      "ann_return_pct": 4.1257722461830015,
+      "ann_vol_pct": 14.119765875226056,
+      "max_drawdown_pct": 20.745118812191855,
+      "avg_turnover": 0.038409867881658795,
+      "pass": false
+    },
+    {
+      "scheme": "V",
+      "name": "波动率倒数",
+      "months": 70,
+      "final_nav": 1.3104846663892686,
+      "ann_return_pct": 4.744490924267808,
+      "ann_vol_pct": 5.590354965223916,
+      "max_drawdown_pct": 6.945373436769509,
+      "avg_turnover": 0.037799401183046616,
+      "pass": true
+    },
+    {
+      "scheme": "M",
+      "name": "动量前三",
+      "months": 70,
+      "final_nav": 1.9203403923497362,
+      "ann_return_pct": 11.835355575009343,
+      "ann_vol_pct": 16.915048089404518,
+      "max_drawdown_pct": 26.38140400384953,
+      "avg_turnover": 0.25949758673938206,
+      "pass": false
+    },
+    {
+      "scheme": "D",
+      "name": "低波动前三",
+      "months": 70,
+      "final_nav": 1.607853877494326,
+      "ann_return_pct": 8.481718427921292,
+      "ann_vol_pct": 6.290630084050893,
+      "max_drawdown_pct": 6.981445784040785,
+      "avg_turnover": 0.08121040177340608,
+      "pass": true
+    }
+  ]
+}

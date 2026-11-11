@@ -1,0 +1,77 @@
+{
+  "choice": "XOM/CVX",
+  "rows": [
+    {
+      "pair": "KO/PEP",
+      "trades": 20,
+      "net": -5593.941374774703,
+      "wins": 4,
+      "stops": 3,
+      "worst": -1206.9424256951654,
+      "pass": false
+    },
+    {
+      "pair": "V/MA",
+      "trades": 24,
+      "net": 2467.765765311582,
+      "wins": 15,
+      "stops": 8,
+      "worst": -450.4836122054778,
+      "pass": false
+    },
+    {
+      "pair": "HD/LOW",
+      "trades": 18,
+      "net": -150.55518304470127,
+      "wins": 10,
+      "stops": 3,
+      "worst": -974.9534596551246,
+      "pass": false
+    },
+    {
+      "pair": "XOM/CVX",
+      "trades": 20,
+      "net": 2601.4355858841327,
+      "wins": 15,
+      "stops": 2,
+      "worst": -1101.249916886715,
+      "pass": true
+    },
+    {
+      "pair": "JPM/BAC",
+      "trades": 27,
+      "net": 455.0409632657809,
+      "wins": 14,
+      "stops": 6,
+      "worst": -1208.7288786962401,
+      "pass": false
+    },
+    {
+      "pair": "UPS/FDX",
+      "trades": 18,
+      "net": -3969.7440317717387,
+      "wins": 6,
+      "stops": 2,
+      "worst": -1640.9755980817743,
+      "pass": false
+    },
+    {
+      "pair": "GS/MS",
+      "trades": 24,
+      "net": 3281.9404838334026,
+      "wins": 14,
+      "stops": 6,
+      "worst": -522.6280325362164,
+      "pass": false
+    },
+    {
+      "pair": "PG/CL",
+      "trades": 20,
+      "net": 1131.8269512313423,
+      "wins": 9,
+      "stops": 1,
+      "worst": -545.1998247608602,
+      "pass": true
+    }
+  ]
+}

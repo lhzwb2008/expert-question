@@ -1,0 +1,45 @@
+{
+  "choice": "VWAP",
+  "rows": [
+    {
+      "algo": "TWAP",
+      "name": "匀速",
+      "days": 61,
+      "mean_vs_vwap_bp": 0.45440046379122273,
+      "std_vs_vwap_bp": 6.955395983782412,
+      "worst_vs_vwap_bp": 17.606251876469692,
+      "mean_vs_arrival_bp": 15.829054710622142,
+      "pass": true
+    },
+    {
+      "algo": "VWAP",
+      "name": "按成交量分布",
+      "days": 61,
+      "mean_vs_vwap_bp": -0.6687544341796166,
+      "std_vs_vwap_bp": 6.538821124671409,
+      "worst_vs_vwap_bp": 13.120933729395823,
+      "mean_vs_arrival_bp": 14.65077341262983,
+      "pass": true
+    },
+    {
+      "algo": "POV",
+      "name": "跟量",
+      "days": 61,
+      "mean_vs_vwap_bp": -6.965536858098173,
+      "std_vs_vwap_bp": 40.84466988288397,
+      "worst_vs_vwap_bp": 89.44053333810098,
+      "mean_vs_arrival_bp": 8.12047839661504,
+      "pass": false
+    },
+    {
+      "algo": "AM",
+      "name": "上午完成",
+      "days": 61,
+      "mean_vs_vwap_bp": -2.7640377287066613,
+      "std_vs_vwap_bp": 22.343506918442497,
+      "worst_vs_vwap_bp": 52.36463119850265,
+      "mean_vs_arrival_bp": 12.52571836627134,
+      "pass": false
+    }
+  ]
+}
