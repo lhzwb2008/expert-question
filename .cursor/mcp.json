@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "us-stocks": {
+      "url": "https://mcp-stocks-us.gino.im/mcp"
+    }
+  }
+}

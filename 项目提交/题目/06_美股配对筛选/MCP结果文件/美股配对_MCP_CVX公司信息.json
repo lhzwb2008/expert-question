@@ -1,0 +1,24 @@
+{
+ "查询时间": "2026-11-11 22:05:18 北京时间",
+ "MCP服务地址": "https://mcp-stocks-us.gino.im/mcp",
+ "MCP服务端": {
+  "name": "Financial Information Integration",
+  "version": "2.14.7"
+ },
+ "工具": "get_stock_info",
+ "参数": {
+  "ticker": "CVX"
+ },
+ "原始返回": {
+  "content": [
+   {
+    "type": "text",
+    "text": "{\"symbol\": \"CVX\", \"longName\": \"Chevron Corporation\", \"quoteType\": \"EQUITY\", \"sector\": \"Energy\", \"industry\": \"Oil & Gas Integrated\", \"currency\": \"USD\", \"currentPrice\": 211.22, \"previousClose\": 210.78, \"dayLow\": 206.01, \"dayHigh\": 211.84, \"volume\": 9835773, \"averageVolume\": 8480521, \"fiftyTwoWeekLow\": 146.49, \"fiftyTwoWeekHigh\": 236.48, \"marketCap\": 412143779840, \"trailingPE\": 15.508077, \"forwardPE\": 12.804759, \"trailingEps\": 13.62, \"profitMargins\": 0.11923, \"returnOnEquity\": 0.13853, \"revenueGrowth\": 0.348, \"debtToEquity\": 16.769, \"dividendYield\": 3.37, \"exDividendDate\": 1794960000, \"targetMeanPrice\": 243.45833, \"recommendationKey\": \"buy\", \"numberOfAnalystOpinions\": 24, \"beta\": 0.453, \"longBusinessSummary\": \"Chevron Corporation, through its subsidiaries, engages in the integrated energy and chemicals operations. It operates through Upstream and Downstream segments. The Upstream segment engages in the exploration for, development, production, and transportation of crude oil and natural gas; processing, l...\"}"
+   }
+  ],
+  "structuredContent": {
+   "result": "{\"symbol\": \"CVX\", \"longName\": \"Chevron Corporation\", \"quoteType\": \"EQUITY\", \"sector\": \"Energy\", \"industry\": \"Oil & Gas Integrated\", \"currency\": \"USD\", \"currentPrice\": 211.22, \"previousClose\": 210.78, \"dayLow\": 206.01, \"dayHigh\": 211.84, \"volume\": 9835773, \"averageVolume\": 8480521, \"fiftyTwoWeekLow\": 146.49, \"fiftyTwoWeekHigh\": 236.48, \"marketCap\": 412143779840, \"trailingPE\": 15.508077, \"forwardPE\": 12.804759, \"trailingEps\": 13.62, \"profitMargins\": 0.11923, \"returnOnEquity\": 0.13853, \"revenueGrowth\": 0.348, \"debtToEquity\": 16.769, \"dividendYield\": 3.37, \"exDividendDate\": 1794960000, \"targetMeanPrice\": 243.45833, \"recommendationKey\": \"buy\", \"numberOfAnalystOpinions\": 24, \"beta\": 0.453, \"longBusinessSummary\": \"Chevron Corporation, through its subsidiaries, engages in the integrated energy and chemicals operations. It operates through Upstream and Downstream segments. The Upstream segment engages in the exploration for, development, production, and transportation of crude oil and natural gas; processing, l...\"}"
+  },
+  "isError": false
+ }
+}

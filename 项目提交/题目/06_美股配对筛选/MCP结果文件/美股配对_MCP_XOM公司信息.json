@@ -1,0 +1,24 @@
+{
+ "查询时间": "2026-11-11 22:05:12 北京时间",
+ "MCP服务地址": "https://mcp-stocks-us.gino.im/mcp",
+ "MCP服务端": {
+  "name": "Financial Information Integration",
+  "version": "2.14.7"
+ },
+ "工具": "get_stock_info",
+ "参数": {
+  "ticker": "XOM"
+ },
+ "原始返回": {
+  "content": [
+   {
+    "type": "text",
+    "text": "{\"symbol\": \"XOM\", \"longName\": \"ExxonMobil Holdings Corporation\", \"quoteType\": \"EQUITY\", \"sector\": \"Energy\", \"industry\": \"Oil & Gas Integrated\", \"currency\": \"USD\", \"currentPrice\": 164.47, \"previousClose\": 164.73, \"dayLow\": 160.1101, \"dayHigh\": 164.96, \"volume\": 11480641, \"averageVolume\": 13609407, \"fiftyTwoWeekLow\": 114.19, \"fiftyTwoWeekHigh\": 188.5, \"marketCap\": 670909726720, \"trailingPE\": 16.920782, \"forwardPE\": 13.209848, \"trailingEps\": 9.72, \"profitMargins\": 0.10463, \"returnOnEquity\": 0.15528, \"revenueGrowth\": 0.326, \"debtToEquity\": 12.568, \"dividendYield\": 2.6, \"exDividendDate\": 1794787200, \"targetMeanPrice\": 185.04546, \"recommendationKey\": \"buy\", \"numberOfAnalystOpinions\": 22, \"beta\": 0.141, \"longBusinessSummary\": \"ExxonMobil Holdings Corporation engages in the exploration and production of crude oil and natural gas in the United States, Canada, and internationally. The company operates through Upstream, Energy Products, Chemical Products, and Specialty Products segments. Its Upstream segment explores for and...\"}"
+   }
+  ],
+  "structuredContent": {
+   "result": "{\"symbol\": \"XOM\", \"longName\": \"ExxonMobil Holdings Corporation\", \"quoteType\": \"EQUITY\", \"sector\": \"Energy\", \"industry\": \"Oil & Gas Integrated\", \"currency\": \"USD\", \"currentPrice\": 164.47, \"previousClose\": 164.73, \"dayLow\": 160.1101, \"dayHigh\": 164.96, \"volume\": 11480641, \"averageVolume\": 13609407, \"fiftyTwoWeekLow\": 114.19, \"fiftyTwoWeekHigh\": 188.5, \"marketCap\": 670909726720, \"trailingPE\": 16.920782, \"forwardPE\": 13.209848, \"trailingEps\": 9.72, \"profitMargins\": 0.10463, \"returnOnEquity\": 0.15528, \"revenueGrowth\": 0.326, \"debtToEquity\": 12.568, \"dividendYield\": 2.6, \"exDividendDate\": 1794787200, \"targetMeanPrice\": 185.04546, \"recommendationKey\": \"buy\", \"numberOfAnalystOpinions\": 22, \"beta\": 0.141, \"longBusinessSummary\": \"ExxonMobil Holdings Corporation engages in the exploration and production of crude oil and natural gas in the United States, Canada, and internationally. The company operates through Upstream, Energy Products, Chemical Products, and Specialty Products segments. Its Upstream segment explores for and...\"}"
+  },
+  "isError": false
+ }
+}
