@@ -1,0 +1,53 @@
+{
+  "id": "machine-eval",
+  "name": "机器评估",
+  "version": "1.0.0",
+  "kind": "viewer",
+  "description": "当前模型视频的证据时间轴与评分要求、机评判断对照",
+  "sdk": {
+    "min": "1.0.0",
+    "maxExclusive": "2.0.0"
+  },
+  "requires": [
+    "context.current-row",
+    "surface.canvas"
+  ],
+  "provides": [
+    "evaluation.machine"
+  ],
+  "permissions": [
+    "context.read",
+    "storage.local"
+  ],
+  "activationEvents": [
+    "tool:visible",
+    "recipe:machine-eval"
+  ],
+  "files": [
+    "blocks/machine-eval/timeline-model.js",
+    "blocks/machine-eval/workbench.js"
+  ],
+  "readyGlobals": [
+    "__cyleEvaluationTimelineV1",
+    "__cyleMachineEvaluationV1"
+  ],
+  "factoryGlobal": "__cyleMachineEvaluationV1",
+  "isolation": {
+    "mode": "shadow",
+    "lifecycleTimeoutMs": 12000,
+    "maxFailures": 3
+  },
+  "tool": {
+    "title": "机器评估",
+    "badge": "只读",
+    "keywords": [
+      "机器评估",
+      "rubric"
+    ],
+    "defaultWidth": 1000,
+    "defaultHeight": 800,
+    "minimumWidth": 400,
+    "minimumHeight": 350,
+    "autoHeight": false
+  }
+}

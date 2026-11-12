@@ -3,5 +3,6 @@
 .env.*
 __pycache__/
 *.pyc
-cases/**/selftest/
+high-econ/**/selftest/
+office-expert/video-review/trial-*/
 RSI-*.pdf

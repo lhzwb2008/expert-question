@@ -1,0 +1,62 @@
+{
+  "id": "human-eval",
+  "name": "人工评估",
+  "version": "1.0.0",
+  "kind": "viewer",
+  "description": "当前模型的人评表单、本地备份与受控飞书回写",
+  "sdk": {
+    "min": "1.0.0",
+    "maxExclusive": "2.0.0"
+  },
+  "requires": [
+    "context.current-row",
+    "surface.canvas"
+  ],
+  "provides": [
+    "evaluation.human"
+  ],
+  "permissions": [
+    "context.read",
+    "storage.local",
+    "data.write"
+  ],
+  "activationEvents": [
+    "tool:visible",
+    "recipe:human-eval"
+  ],
+  "files": [
+    "blocks/machine-eval/timeline-model.js",
+    "blocks/machine-eval/workbench.js",
+    "blocks/human-eval/timeline.js",
+    "blocks/human-eval/result-model.js",
+    "blocks/human-eval/review-list.js",
+    "blocks/human-eval/workbench.js"
+  ],
+  "readyGlobals": [
+    "__cyleEvaluationTimelineV1",
+    "__cyleMachineEvaluationV1",
+    "__cyleHumanTimelineV1",
+    "__cyleHumanResultV1",
+    "__cyleHumanReviewListV1",
+    "__cyleHumanEvaluationV1"
+  ],
+  "factoryGlobal": "__cyleHumanEvaluationV1",
+  "isolation": {
+    "mode": "shadow",
+    "lifecycleTimeoutMs": 12000,
+    "maxFailures": 3
+  },
+  "tool": {
+    "title": "人工评估",
+    "badge": "人评页面",
+    "keywords": [
+      "人评",
+      "人工评估"
+    ],
+    "defaultWidth": 1000,
+    "defaultHeight": 800,
+    "minimumWidth": 400,
+    "minimumHeight": 350,
+    "autoHeight": false
+  }
+}

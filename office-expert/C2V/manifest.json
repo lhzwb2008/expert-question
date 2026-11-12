@@ -1,0 +1,68 @@
+{
+  "manifest_version": 3,
+  "name": "C2V",
+  "short_name": "C2V",
+  "version": "1.0.11",
+  "description": "Composable Feishu annotation workbench with lazy blocks, governed drafts, media synchronization, validation, and controlled write-back.",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage"
+  ],
+  "host_permissions": [
+    "*://*.feishu.cn/*",
+    "*://*.larksuite.com/*",
+    "*://*.larkoffice.com/*",
+    "*://*.byted.org/*",
+    "*://*.bytedance.com/*",
+    "*://*.volces.com/*",
+    "http://127.0.0.1/*"
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; media-src https: http://127.0.0.1 blob:; img-src 'self' data: blob: https: http://127.0.0.1;"
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "assets/themes/*",
+        "assets/themes/mascots/*"
+      ],
+      "matches": [
+        "*://*.feishu.cn/*",
+        "*://*.larksuite.com/*",
+        "*://*.larkoffice.com/*",
+        "*://*.byted.org/*",
+        "*://*.bytedance.com/*",
+        "http://127.0.0.1/*"
+      ]
+    }
+  ],
+  "action": {
+    "default_title": "打开 C2V",
+    "default_icon": {
+      "16": "assets/icons/c2v-plush-16.png",
+      "32": "assets/icons/c2v-plush-32.png",
+      "48": "assets/icons/c2v-plush-48.png",
+      "128": "assets/icons/c2v-plush-128.png"
+    }
+  },
+  "commands": {
+    "toggle-inspector": {
+      "suggested_key": {
+        "default": "Alt+Shift+G",
+        "mac": "Alt+Shift+G"
+      },
+      "description": "显示或隐藏 C2V"
+    }
+  },
+  "icons": {
+    "16": "assets/icons/c2v-plush-16.png",
+    "32": "assets/icons/c2v-plush-32.png",
+    "48": "assets/icons/c2v-plush-48.png",
+    "128": "assets/icons/c2v-plush-128.png"
+  }
+}

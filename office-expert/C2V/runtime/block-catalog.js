@@ -1,0 +1,195 @@
+(() => {
+  'use strict';
+
+  const CATALOG_KEY = '__annotationHarnessBlockCatalogV1';
+  if (globalThis[CATALOG_KEY]) return;
+  const sdk = globalThis.__cyleBlockSdkV1;
+  if (!sdk) throw new Error('Cyle Block SDK 未加载');
+
+  const catalog = [
+  {
+    "id": "machine-eval",
+    "name": "机器评估",
+    "version": "1.0.0",
+    "kind": "viewer",
+    "description": "当前模型视频的证据时间轴与评分要求、机评判断对照",
+    "sdk": {
+      "min": "1.0.0",
+      "maxExclusive": "2.0.0"
+    },
+    "requires": [
+      "context.current-row",
+      "surface.canvas"
+    ],
+    "provides": [
+      "evaluation.machine"
+    ],
+    "permissions": [
+      "context.read",
+      "storage.local"
+    ],
+    "activationEvents": [
+      "tool:visible",
+      "recipe:machine-eval"
+    ],
+    "files": [
+      "blocks/machine-eval/timeline-model.js",
+      "blocks/machine-eval/workbench.js"
+    ],
+    "readyGlobals": [
+      "__cyleEvaluationTimelineV1",
+      "__cyleMachineEvaluationV1"
+    ],
+    "factoryGlobal": "__cyleMachineEvaluationV1",
+    "isolation": {
+      "mode": "shadow",
+      "lifecycleTimeoutMs": 12000,
+      "maxFailures": 3
+    },
+    "tool": {
+      "title": "机器评估",
+      "badge": "只读",
+      "keywords": [
+        "机器评估",
+        "rubric"
+      ],
+      "defaultWidth": 1000,
+      "defaultHeight": 800,
+      "minimumWidth": 400,
+      "minimumHeight": 350,
+      "autoHeight": false
+    }
+  },
+  {
+    "id": "human-eval",
+    "name": "人工评估",
+    "version": "1.0.0",
+    "kind": "viewer",
+    "description": "当前模型的人评表单、本地备份与受控飞书回写",
+    "sdk": {
+      "min": "1.0.0",
+      "maxExclusive": "2.0.0"
+    },
+    "requires": [
+      "context.current-row",
+      "surface.canvas"
+    ],
+    "provides": [
+      "evaluation.human"
+    ],
+    "permissions": [
+      "context.read",
+      "storage.local",
+      "data.write"
+    ],
+    "activationEvents": [
+      "tool:visible",
+      "recipe:human-eval"
+    ],
+    "files": [
+      "blocks/machine-eval/timeline-model.js",
+      "blocks/machine-eval/workbench.js",
+      "blocks/human-eval/timeline.js",
+      "blocks/human-eval/result-model.js",
+      "blocks/human-eval/review-list.js",
+      "blocks/human-eval/workbench.js"
+    ],
+    "readyGlobals": [
+      "__cyleEvaluationTimelineV1",
+      "__cyleMachineEvaluationV1",
+      "__cyleHumanTimelineV1",
+      "__cyleHumanResultV1",
+      "__cyleHumanReviewListV1",
+      "__cyleHumanEvaluationV1"
+    ],
+    "factoryGlobal": "__cyleHumanEvaluationV1",
+    "isolation": {
+      "mode": "shadow",
+      "lifecycleTimeoutMs": 12000,
+      "maxFailures": 3
+    },
+    "tool": {
+      "title": "人工评估",
+      "badge": "人评页面",
+      "keywords": [
+        "人评",
+        "人工评估"
+      ],
+      "defaultWidth": 1000,
+      "defaultHeight": 800,
+      "minimumWidth": 400,
+      "minimumHeight": 350,
+      "autoHeight": false
+    }
+  },
+  {
+    "id": "caption-review",
+    "name": "多模型比对",
+    "version": "1.2.0",
+    "kind": "editor",
+    "description": "多个模型等宽并列的人评比对，每列独立编辑、时间轴和受控回写",
+    "sdk": {
+      "min": "1.0.0",
+      "maxExclusive": "2.0.0"
+    },
+    "requires": [
+      "context.current-row",
+      "surface.canvas"
+    ],
+    "provides": [
+      "evaluation.model-compare"
+    ],
+    "permissions": [
+      "context.read",
+      "storage.local",
+      "data.write"
+    ],
+    "activationEvents": [
+      "tool:visible",
+      "recipe:caption-review"
+    ],
+    "files": [
+      "blocks/machine-eval/timeline-model.js",
+      "blocks/machine-eval/workbench.js",
+      "blocks/human-eval/timeline.js",
+      "blocks/human-eval/result-model.js",
+      "blocks/human-eval/review-list.js",
+      "blocks/human-eval/workbench.js",
+      "blocks/caption-review/compare.js"
+    ],
+    "readyGlobals": [
+      "__cyleEvaluationTimelineV1",
+      "__cyleMachineEvaluationV1",
+      "__cyleHumanTimelineV1",
+      "__cyleHumanResultV1",
+      "__cyleHumanReviewListV1",
+      "__cyleHumanEvaluationV1",
+      "__cyleModelCompareV1"
+    ],
+    "factoryGlobal": "__cyleModelCompareV1",
+    "isolation": {
+      "mode": "shadow",
+      "lifecycleTimeoutMs": 12000,
+      "maxFailures": 3
+    },
+    "tool": {
+      "title": "多模型比对",
+      "badge": "模型比对",
+      "keywords": [
+        "模型",
+        "人评",
+        "比对"
+      ],
+      "defaultWidth": 1000,
+      "defaultHeight": 800,
+      "minimumWidth": 400,
+      "minimumHeight": 350,
+      "autoHeight": false
+    },
+    "order": 30
+  }
+];
+  globalThis[CATALOG_KEY] = Object.freeze(catalog.map((record) => (
+    sdk.validateManifest(record)
+  )));
+})();

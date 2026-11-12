@@ -1,0 +1,66 @@
+{
+  "id": "caption-review",
+  "name": "多模型比对",
+  "version": "1.2.0",
+  "kind": "editor",
+  "description": "多个模型等宽并列的人评比对，每列独立编辑、时间轴和受控回写",
+  "sdk": {
+    "min": "1.0.0",
+    "maxExclusive": "2.0.0"
+  },
+  "requires": [
+    "context.current-row",
+    "surface.canvas"
+  ],
+  "provides": [
+    "evaluation.model-compare"
+  ],
+  "permissions": [
+    "context.read",
+    "storage.local",
+    "data.write"
+  ],
+  "activationEvents": [
+    "tool:visible",
+    "recipe:caption-review"
+  ],
+  "files": [
+    "blocks/machine-eval/timeline-model.js",
+    "blocks/machine-eval/workbench.js",
+    "blocks/human-eval/timeline.js",
+    "blocks/human-eval/result-model.js",
+    "blocks/human-eval/review-list.js",
+    "blocks/human-eval/workbench.js",
+    "blocks/caption-review/compare.js"
+  ],
+  "readyGlobals": [
+    "__cyleEvaluationTimelineV1",
+    "__cyleMachineEvaluationV1",
+    "__cyleHumanTimelineV1",
+    "__cyleHumanResultV1",
+    "__cyleHumanReviewListV1",
+    "__cyleHumanEvaluationV1",
+    "__cyleModelCompareV1"
+  ],
+  "factoryGlobal": "__cyleModelCompareV1",
+  "isolation": {
+    "mode": "shadow",
+    "lifecycleTimeoutMs": 12000,
+    "maxFailures": 3
+  },
+  "tool": {
+    "title": "多模型比对",
+    "badge": "模型比对",
+    "keywords": [
+      "模型",
+      "人评",
+      "比对"
+    ],
+    "defaultWidth": 1000,
+    "defaultHeight": 800,
+    "minimumWidth": 400,
+    "minimumHeight": 350,
+    "autoHeight": false
+  },
+  "order": 30
+}
