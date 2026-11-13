@@ -6,3 +6,7 @@ __pycache__/
 high-econ/**/selftest/
 office-expert/video-review/trial-*/
 RSI-*.pdf
+
+# Magnet 上传包和分钟行情太大，规则与文稿仍入库
+magnet/**/*.zip
+magnet/**/A01_gbpusd_1m.csv
