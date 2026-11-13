@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "作业标注对比",
+  "version": "1.3.0",
+  "description": "保存并对比作业标注，核实统一分数与理由，查看全部维度，导出可写回作业表的完整人评 CSV。",
+  "minimum_chrome_version": "102",
+  "permissions": ["activeTab", "scripting", "storage", "unlimitedStorage", "clipboardRead", "contextMenus"],
+  "optional_host_permissions": ["https://*/*", "http://*/*"],
+  "action": {"default_title": "打开作业标注对比窗口"},
+  "background": {"service_worker": "background.js"},
+  "icons": {"16": "icons/16.png", "48": "icons/48.png", "128": "icons/128.png"}
+}

@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>作业标注对比</title><link rel="stylesheet" href="style.css"></head>
+<body>
+<header><div><p class="eyebrow">保存 · 切换页面 · 对比</p><h1>作业标注对比</h1></div><div class="actions"><button id="export">导出快照</button><button id="import">导入快照</button><button id="clear" class="danger">清空全部缓存</button></div></header>
+<main>
+<div id="notice" role="status" aria-live="polite"></div>
+<section class="source-tools">
+  <div><span class="label">当前来源页面</span><strong id="target-title">请在需要保存的页面点击插件图标</strong><span id="target-url"></span></div>
+  <div class="actions"><button id="capture-a">保存页面到 A</button><button id="capture-b">保存页面到 B</button></div>
+</section>
+<section class="sources">
+  <article><div class="source-head"><h2><span class="letter">A</span> 已保存内容</h2><button id="clear-a" class="subtle-button">清空 A</button></div><div id="source-a" class="source-info">尚未保存</div><div class="actions"><button id="clipboard-a">保存剪贴板到 A</button><button data-paste="a">粘贴内容到 A</button></div></article>
+  <article><div class="source-head"><h2><span class="letter">B</span> 对比内容</h2><button id="clear-b" class="subtle-button">清空 B</button></div><div id="source-b" class="source-info">尚未保存</div><div class="actions"><button id="clipboard-b">保存剪贴板到 B</button><button data-paste="b">粘贴内容到 B</button></div></article>
+</section>
+<details class="help"><summary>飞书表格如何完整保存？</summary><p>在原作业表复制包含<b>题目ID、全部模型的人评表头及需要的题目行</b>的完整区域，按 Ctrl+C。点击插件图标，选择“保存剪贴板到 A”。切到另一张表，同样复制后保存到 B。插件根据“模型名-人评”表头和 JSON 自动识别模型数量、名称及评分，按题号、模型、评分项 ID 对齐。保存后请核对 A/B 显示的模型清单，避免遗漏复制列。</p><p>普通网页可以“保存页面”；选中了文字时只保存选区。画布、视频和未加载的滚动内容无法作为完整文字读取，飞书表格请使用复制区域方式。不同浏览器之间通过导出、导入快照传递内容。</p><button id="load-review">载入本次两表复核快照</button><span id="review-date"></span></details>
+<section id="comparison" hidden>
+  <section id="audit-tools" class="audit-tools" hidden>
+    <div class="actions"><strong>统一答案</strong><span id="audit-progress" class="caption"></span></div>
+    <details id="overview"><summary>查看一道题全部维度分数</summary>
+      <div class="actions overview-controls"><label>查看题号 <select id="overview-case"></select></label></div>
+      <p class="caption">总览包含本题所有模型、全部维度。分数一致及仅单侧存在的模型评分选填，留空沿用原分；差异和真实缺项需确认统一答案。</p><div id="overview-table"></div>
+    </details>
+  </section>
+  <div id="metrics" class="metrics"></div>
+  <div class="filters"><label>题号<select id="case-filter"></select></label><label>模型<select id="model-filter"></select></label><label>查看<select id="mode"><option value="all">全部评分项</option><option value="different">仅分数不同</option><option value="reasons">仅原因不同</option><option value="missing">仅缺项</option></select></label><input id="search" type="search" aria-label="搜索原因" placeholder="搜索备注、原因或评分项…"><button id="expand">展开全部</button><button id="collapse">收起全部</button></div>
+  <p id="results-info" class="caption"></p><div id="results"></div>
+</section>
+<section id="empty" class="empty"><h2>先保存 A，再保存 B</h2><p>保存的内容会保留到你主动清空。切换页面后点击插件图标，即可继续对比。</p><button id="load-review-empty" class="primary">查看本次作业复核</button></section>
+<footer><span>内容仅保存在此浏览器本地，插件不向服务器发送内容。</span><span id="cache-size"></span></footer>
+<section id="csv-export" class="audit-tools bottom-export" hidden>
+  <h2>导出核实后的完整评分</h2>
+  <div class="actions overview-controls"><label>题号 <select id="export-case"></select></label><button id="export-writeback-csv" class="primary">导出核实评分 CSV</button></div>
+  <p class="caption">差异和真实缺项确认后即可导出本题全部维度。一致项及仅单侧模型选填，留空沿用原分和原始理由。人评列按实际识别的模型导出，B 列顺序优先，再追加 A 独有模型；按列名写回对应表。文件名为题号，如 Q001.csv。</p>
+  <p id="export-status" role="status" class="caption"></p>
+</section>
+</main>
+<dialog id="paste-dialog"><form id="paste-form"><h2 id="paste-title">粘贴内容</h2><p>粘贴完整表格区域、标注 JSON 或普通页面文字。</p><input id="paste-name" placeholder="内容名称（可选）" aria-label="内容名称"><p id="paste-info" role="status"></p><textarea id="paste-text" required spellcheck="false" wrap="off" placeholder="在这里按 Ctrl+V…" aria-label="粘贴完整内容"></textarea><div class="actions"><button type="button" id="cancel-paste">取消</button><button type="submit" class="primary">保存并对比</button></div></form></dialog>
+<dialog id="clear-dialog"><h2>清空已保存内容？</h2><p>将删除 A、B、导入的快照、统一答案、确认结果和临时粘贴内容。清空后不会自动重新载入；已导出的文件不受影响。</p><div class="actions"><button id="cancel-clear">取消</button><button id="confirm-clear" class="danger">清空全部</button></div></dialog>
+<input type="file" id="import-file" accept=".json,application/json" hidden>
+<script src="core.js"></script><script src="audit.js"></script><script src="app.js"></script>
+</body></html>

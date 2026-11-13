@@ -5,6 +5,7 @@ __pycache__/
 *.pyc
 high-econ/**/selftest/
 office-expert/video-review/trial-*/
+office-expert/review-compare/review.json
 RSI-*.pdf
 张先生*.pdf
 
