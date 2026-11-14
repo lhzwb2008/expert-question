@@ -120,7 +120,8 @@ def main() -> None:
                 f"平仓 z 值 {t2.exit_z:.4f}，净收益 {t2.pnl:.2f} 美元。",
             ]),
             ("行业核对", [
-                f"定下 XOM/CVX 之后，用 US Stocks MCP 的 get_stock_info 分别查询了两只股票（{info['XOM'][0]['查询时间']}）。"
+                f"定下 XOM/CVX 之后，用 US Stocks MCP 的 get_stock_info 分别查询了两只股票：XOM 的查询时间是 {info['XOM'][0]['查询时间']}，"
+                f"CVX 的查询时间是 {info['CVX'][0]['查询时间']}。"
                 f"XOM 返回的公司名称是 {a['longName']}，CVX 是 {b['longName']}。两只的 sector 都是 {a['sector']}，industry 都是 {a['industry']}。",
                 f"两只股票目前属于同一行业，和 A02 的行业标注「{tag}」相符，同行业配对的前提成立。",
             ]),

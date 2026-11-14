@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
-"""打包「港股持仓流动性限额」这道题：题目附件、标准答案附件。
+"""打包「港股持仓变现能力与开放频率」这道题：题目附件、标准答案附件。
 
-这道题没有底稿，是 2026-11-11 新出的。成交量和收盘价全部来自 US Stocks MCP 的实际调用（新题数据/港股流动性/），
-口径文件在 新题口径/港股流动性/。持股数是下面 HOLD 里拟的。
+2026-11-14 按质检意见重做。原来是三条限额、超限减持、整改后重算，和 A 股调仓指令复核的任务链重复；
+现在没有限额和整改，任务是测算持仓的变现阶梯和四档赎回情景下按比例卖出所需的天数，再按 30% 赎回情景给产品的开放频率定档。
+
+成交量和收盘价全部来自 US Stocks MCP 的实际调用（新题数据/港股流动性/），口径文件在 新题口径/港股流动性/。持股数是下面 HOLD 里拟的。
 A01、A02 快照收录十一只股票，云顶新耀（1952.HK）留给在线 MCP 查询。
 
 脚本做的事：
 1. 生成 A01（日成交量）和 A02（持仓清单，含基准日收盘价）。
 2. 只用题目附件加云顶新耀的 MCP 结果文件重算，生成标准答案附件。
-3. 检查三条限额离门槛的距离，并算一遍常见错误的结果。
+3. 检查 30% 赎回情景离档位边界的距离，并算一遍常见错误的结果。
 """
 from __future__ import annotations
 
@@ -24,13 +26,15 @@ from build_common import OUT, copy_as, fresh_dir, load_mcp_prices, source_line, 
 HERE = Path(__file__).resolve().parent
 RAW = HERE / "新题数据" / "港股流动性"
 DOC = HERE / "新题口径" / "港股流动性"
-DST = OUT / "题目" / "12_港股持仓流动性限额"
+DST = OUT / "题目" / "12_港股持仓变现能力"
 PREFIX = "港股流动性_"
 MCP_CODE = "1952.HK"
 MCP_FILE = f"{PREFIX}MCP_1952.HK日线.json"
 FIRST, BASE = "2026-05-04", "2026-10-30"
 PART = F(1, 4)
-MAX_DAYS, LIM_D1, LIM_D3 = 5, F(55, 100), F(85, 100)
+LADDER = (1, 2, 3, 5, 10)
+REDEEM = (F(1, 10), F(2, 10), F(3, 10), F(5, 10))
+KEY = F(3, 10)
 HOLD = [  # 代码, 名称, 持股数
     ("0700.HK", "腾讯控股", 612000),
     ("9988.HK", "阿里巴巴-W", 2435000),
@@ -40,11 +44,15 @@ HOLD = [  # 代码, 名称, 持股数
     ("0883.HK", "中国海洋石油", 7060000),
     ("0388.HK", "香港交易所", 395000),
     ("6990.HK", "科伦博泰生物-B", 848600),
-    ("1952.HK", "云顶新耀", 8950000),
-    ("9969.HK", "诺诚健华", 19600000),
+    ("1952.HK", "云顶新耀", 16800000),
+    ("9969.HK", "诺诚健华", 12000000),
     ("9626.HK", "哔哩哔哩-W", 2380000),
     ("3896.HK", "金山云", 29500000),
 ]
+
+
+def grade(days: int) -> str:
+    return "每日开放" if days <= 3 else ("每周开放" if days <= 5 else "每月开放")
 
 
 def measure(hold: list[dict], vol: dict[str, list[int]], close: dict[str, F], mode: str = "min"):
@@ -57,24 +65,20 @@ def measure(hold: list[dict], vol: dict[str, list[int]], close: dict[str, F], mo
         use = {"min": min(adv20, adv60), "adv20": adv20, "adv60": adv60}[mode]
         cap = math.floor(use * PART)
         s = int(h["shares"])
-        days = -(-s // cap)
-        keep = min(s, MAX_DAYS * cap)
-        rows.append(dict(code=h["code"], name=h["name"], shares=s, close=close[h["code"]], adv20=adv20, adv60=adv60, use=use, cap=cap,
-                         days=days, over=days > MAX_DAYS, cut=s - keep, keep=keep))
-
-    def ladder(key: str):
-        total = sum(r[key] * r["close"] for r in rows)
-        d = {n: sum(min(r[key], n * r["cap"]) * r["close"] for r in rows) for n in (1, 3)}
-        return dict(total=total, v1=d[1], v3=d[3], p1=d[1] / total, p3=d[3] / total)
-
-    now, fixed = ladder("shares"), ladder("keep")
-    over = [r for r in rows if r["over"]]
-    for res, n_over in ((now, len(over)), (fixed, 0)):
-        res["ok1"], res["ok2"], res["ok3"] = n_over == 0, res["p1"] >= LIM_D1, res["p3"] >= LIM_D3
-        res["n_over"] = n_over
-    ok = lambda r: r["ok1"] and r["ok2"] and r["ok3"]
-    verdict = "通过" if ok(now) else ("整改后通过" if ok(fixed) else "整改后仍不通过")
-    return rows, now, fixed, verdict
+        rows.append(dict(code=h["code"], name=h["name"], shares=s, close=close[h["code"]], value=s * close[h["code"]],
+                         adv20=adv20, adv60=adv60, use=use, cap=cap, days=-(-s // cap)))
+    total = sum(r["value"] for r in rows)
+    ladder = []
+    for n in LADDER:
+        v = sum(min(r["shares"], n * r["cap"]) * r["close"] for r in rows)
+        ladder.append(dict(n=n, v=v, p=v / total))
+    scen = []
+    for x in REDEEM:
+        need = {r["code"]: -(-math.ceil(r["shares"] * x) // r["cap"]) for r in rows}
+        d = max(need.values())
+        scen.append(dict(x=x, days=d, who=[r for r in rows if need[r["code"]] == d], need=need))
+    key = next(s for s in scen if s["x"] == KEY)
+    return rows, total, ladder, scen, grade(key["days"])
 
 
 def main() -> None:
@@ -101,8 +105,8 @@ def main() -> None:
             for day, v in d.Volume.items():
                 w1.writerow([day, code, int(v)])
             w2.writerow([code, name, shares, f"{float(d.Close[BASE]):.2f}"])
-    for name in ["A03_流动性口径.md", "A04_限额与交付.md"]:
-        copy_as(DOC / name, att / f"{PREFIX}{name}")
+    copy_as(DOC / "A03_流动性口径.md", att / f"{PREFIX}A03_流动性口径.md")
+    copy_as(DOC / "A04_定档规则与交付.md", att / f"{PREFIX}A04_定档规则与交付.md")
     copy_as(DST / "MCP结果文件" / MCP_FILE, att / MCP_FILE)
 
     # 2. 只用题目附件重算
@@ -116,61 +120,66 @@ def main() -> None:
     vol[MCP_CODE] = [int(x) for x in mb.Volume]
     close[MCP_CODE] = F(f"{float(mb.Close[BASE]):.2f}")
     assert len(vol) == 12 and len(close) == 12
-    rows, now, fixed, verdict = measure(hold, vol, close)
+    rows, total, ladder, scen, verdict = measure(hold, vol, close)
 
-    pc = lambda x: f"{float(x) * 100:.2f}%"
-    print(f"结论 {verdict}")
+    fl = float
+    pc = lambda x: f"{fl(x) * 100:.2f}%"
+    print(f"A01 {len(a01)} 行。结论 {verdict}。组合总市值 {fl(total):,.2f}")
+    rank = sorted(rows, key=lambda r: -r["value"])
     for r in rows:
-        print(f"  {r['code']} {r['name']:9} 持 {r['shares']:>10,} 价 {float(r['close']):>7.2f} 市值 {float(r['shares'] * r['close']) / 1e6:>7.1f}m "
-              f"ADV20 {float(r['adv20']):>13,.1f} ADV60 {float(r['adv60']):>13,.1f} 日可变现 {r['cap']:>10,} 天数 {r['days']:>2} "
-              f"{'超限 减持 %d' % r['cut'] if r['over'] else ''}")
-    for tag, r in (("现状", now), ("整改后", fixed)):
-        print(f"  {tag}：总市值 {float(r['total']):,.2f}，1日 {float(r['v1']):,.2f}（{pc(r['p1'])}），3日 {float(r['v3']):,.2f}（{pc(r['p3'])}），限额 {r['ok1']} {r['ok2']} {r['ok3']}")
-    over = [r for r in rows if r["over"]]
-    assert verdict == "整改后通过" and [r["code"] for r in over] == ["6990.HK", "1952.HK", "9969.HK"]
-    assert now["ok2"] and not now["ok3"]
-    for r in (now, fixed):
-        assert abs(r["p1"] - LIM_D1) > F(1, 100) and abs(r["p3"] - LIM_D3) > F(1, 100)
-    for r in rows:   # 变现天数离 5 天的门槛不能只差一点点
-        assert abs(r["shares"] - MAX_DAYS * r["cap"]) > r["cap"] // 20, r["code"]
-    cut_value = sum(r["cut"] * r["close"] for r in rows)
+        print(f"  {r['code']} {r['name']:9} 持 {r['shares']:>10,} 价 {fl(r['close']):>7.2f} 市值 {fl(r['value']):>16,.2f} 第{rank.index(r) + 1:>2} "
+              f"ADV20 {fl(r['adv20']):>13,.2f} ADV60 {fl(r['adv60']):>13,.2f} 日可变现 {r['cap']:>10,} 天数 {r['days']:>2}")
+    for a in ladder:
+        print(f"  {a['n']:>2} 日可变现 {fl(a['v']):,.2f}（{pc(a['p'])}）")
+    for s in scen:
+        print(f"  赎回 {pc(s['x'])}：{s['days']} 天，瓶颈 {[r['name'] for r in s['who']]}，档位 {grade(s['days'])}；各只 {list(s['need'].values())}")
+    x = next(r for r in rows if r["code"] == MCP_CODE)
+    key = next(s for s in scen if s["x"] == KEY)
+    assert verdict == "每周开放" and key["days"] == 4 and [r["code"] for r in key["who"]] == [MCP_CODE]
+    sell = math.ceil(x["shares"] * KEY)
+    assert 3 * x["cap"] * F(11, 10) < sell < 4 * x["cap"] * F(9, 10)   # 离 3 天、4 天两条线都有 10% 以上的距离
+    for s in scen:
+        assert len(s["who"]) == 1
+    full_days = max(r["days"] for r in rows)
+    slow = [r for r in rows if r["days"] == full_days]
 
     # 常见错误
+    wrong = {}
     for mode, label in (("adv20", "只用 ADV20"), ("adv60", "只用 ADV60")):
-        r2, n2, f2, v2 = measure(hold, vol, close, mode)
-        print(f"  {label}：超限 {[r['name'] for r in r2 if r['over']]}，现状 3 日 {pc(n2['p3'])}，结论 {v2}")
+        r2, t2, l2, s2, v2 = measure(hold, vol, close, mode)
+        wrong[mode] = (next(s for s in s2 if s["x"] == KEY), v2, next(r for r in r2 if r["code"] == MCP_CODE))
+        print(f"  {label}：30% 赎回 {wrong[mode][0]['days']} 天，瓶颈 {[r['name'] for r in wrong[mode][0]['who']]}，结论 {v2}；各档 {[s['days'] for s in s2]}")
+    hold11 = [h for h in hold if h["code"] != MCP_CODE]
+    r3, t3, l3, s3, v3 = measure(hold11, vol, close)
+    k3 = next(s for s in s3 if s["x"] == KEY)
+    print(f"  漏掉云顶新耀：总市值 {fl(t3):,.2f}，30% 赎回 {k3['days']} 天，瓶颈 {[r['name'] for r in k3['who']]}，结论 {v3}")
+    assert wrong["adv60"][1] == "每日开放" and v3 == "每日开放"
 
     # 3. 标准答案附件
-    fl = float
-    h_head = ["代码", "名称", "持股数", "基准日收盘价(港元)", "市值(港元)", "ADV20(股)", "ADV60(股)", "可用日均量(股)", "日可变现量(股)", "变现天数",
-              "是否超限", "最少减持股数", "减持后持股数"]
-    h_rows = [[r["code"], r["name"], r["shares"], fl(r["close"]), round(fl(r["shares"] * r["close"]), 2), round(fl(r["adv20"]), 2), round(fl(r["adv60"]), 2),
-               round(fl(r["use"]), 2), r["cap"], r["days"], "超限" if r["over"] else "未超限", r["cut"], r["keep"]] for r in rows]
-    yes = lambda b: "满足" if b else "不满足"
-
-    def col(r):
-        return [round(fl(r["total"]), 2), round(fl(r["v1"]), 2), round(fl(r["p1"]) * 100, 2), round(fl(r["v3"]), 2), round(fl(r["p3"]) * 100, 2),
-                r["n_over"], yes(r["ok1"]), yes(r["ok2"]), yes(r["ok3"])]
-
-    labels = ["组合总市值(港元)", "1日可变现市值(港元)", "1日可变现比例(%)", "3日可变现市值(港元)", "3日可变现比例(%)", "单票超限只数",
-              "限额一：单票变现天数≤5", "限额二：1日可变现比例≥55%", "限额三：3日可变现比例≥85%"]
-    s_rows = [[a, b, c] for a, b, c in zip(labels, col(now), col(fixed))]
-    s_rows.append(["减持市值合计(港元)", "", round(fl(cut_value), 2)])
-    s_rows.append(["结论", "不通过", verdict])
-    x = next(r for r in rows if r["code"] == MCP_CODE)
+    h_head = ["代码", "名称", "持股数", "基准日收盘价(港元)", "市值(港元)", "ADV20(股)", "ADV60(股)", "可用日均量(股)", "日可变现量(股)", "变现天数"]
+    h_rows = [[r["code"], r["name"], r["shares"], fl(r["close"]), round(fl(r["value"]), 2), round(fl(r["adv20"]), 2), round(fl(r["adv60"]), 2),
+               round(fl(r["use"]), 2), r["cap"], r["days"]] for r in rows]
+    l_head = ["N（交易日）", "N日可变现市值(港元)", "N日可变现比例(%)"]
+    l_rows = [[a["n"], round(fl(a["v"]), 2), round(fl(a["p"]) * 100, 2)] for a in ladder]
+    s_head = ["赎回比例(%)", "所需天数", "瓶颈股票", "瓶颈股票要卖的股数", "瓶颈股票日可变现量(股)"]
+    s_rows = [[int(s["x"] * 100), s["days"], "、".join(r["name"] for r in s["who"]), math.ceil(s["who"][0]["shares"] * s["x"]), s["who"][0]["cap"]] for s in scen]
     last20 = mb.tail(20)
     d_rows = [[day, int(v)] for day, v in last20.Volume.items()]
     first60 = mb.index[-60]
-    o_txt = "；".join(f"{r['name']}（{r['code']}）持股 {r['shares']:,} 股，日可变现量 {r['cap']:,} 股，变现天数 {r['days']} 天，最少减持 {r['cut']:,} 股，减持后 {r['keep']:,} 股" for r in over)
     kl = next(r for r in rows if r["code"] == "6990.HK")
+    lad = {a["n"]: a for a in ladder}
+    sc = {int(s["x"] * 100): s for s in scen}
     write_xlsx(
-        ans / "港股持仓流动性测算表.xlsx",
-        [("持仓流动性", h_head, h_rows), ("组合变现比例", ["项目", "现状", "整改后"], s_rows), ("在线数据", ["交易日", "云顶新耀(1952.HK)日成交量(股)"], d_rows)],
+        ans / "港股持仓变现能力测算表.xlsx",
+        [("持仓变现能力", h_head, h_rows), ("变现阶梯", l_head, l_rows), ("赎回情景", s_head, s_rows),
+         ("在线数据", ["交易日", "云顶新耀(1952.HK)日成交量(股)"], d_rows)],
         notes={
-            "持仓流动性": ["可用日均量取 ADV20 和 ADV60 里较小的一个；日可变现量 = 可用日均量 × 25%，向下取整；变现天数向上取整。",
-                      f"超限 {len(over)} 只：{o_txt}。",
-                      f"科伦博泰生物-B 的 ADV20（{fl(kl['adv20']):,.2f}）大于 ADV60（{fl(kl['adv60']):,.2f}），可用日均量取 ADV60；只看 ADV20 时它是 5 天，不会被发现。"],
-            "组合变现比例": [f"现状 3 日可变现比例 {pc(now['p3'])}，低于 85%；整改后 {pc(fixed['p3'])}，三条限额都满足。减持市值合计 {fl(cut_value):,.2f} 港元。"],
+            "持仓变现能力": ["可用日均量取 ADV20 和 ADV60 里较小的一个；日可变现量 = 可用日均量 × 25%，向下取整；变现天数向上取整。",
+                       f"组合总市值 {fl(total):,.2f} 港元。全部变现天数 {full_days} 天，最慢的是{'、'.join(r['name'] for r in slow)}。"],
+            "变现阶梯": [f"1 日可变现比例 {pc(lad[1]['p'])}，3 日 {pc(lad[3]['p'])}，10 日 {pc(lad[10]['p'])}。"],
+            "赎回情景": [f"结论：{verdict}。30% 赎回情景所需天数 {key['days']} 天，落在 4 至 5 个交易日一档。",
+                     f"瓶颈是云顶新耀：要卖 {sell:,} 股，日可变现量 {x['cap']:,} 股，3 天只能卖 {3 * x['cap']:,} 股，要 4 天。",
+                     "每只股票都按赎回比例卖出同样的比例，所需天数取十二只里最大的一个。"],
             "在线数据": [
                 source_line(rec),
                 f"返回 {len(m)} 行，{m.index[0]} 至 {m.index[-1]}。返回的 Date 是 UTC 时间（16:00），加 8 小时后的日期是香港的交易日。",
@@ -180,35 +189,35 @@ def main() -> None:
             ],
         },
     )
+    w60 = wrong["adv60"]
     write_docx(
-        ans / "港股持仓流动性复核意见.docx",
-        "港股持仓流动性限额复核意见",
+        ans / "港股产品开放频率评估意见.docx",
+        "港股组合产品开放频率评估意见",
         [
-            ("结论", [f"整改后通过。现状有 {len(over)} 只股票的变现天数超过 5 个交易日，组合 3 日可变现比例 {pc(now['p3'])}，低于 85%；"
-                    f"按最少减持办法减持这 {len(over)} 只股票后，三条限额都满足。"]),
-            ("现状", [
-                f"组合总市值 {fl(now['total']):,.2f} 港元。",
-                f"限额一（单票变现天数不超过 5 个交易日）：不满足，超限 {len(over)} 只。{o_txt}。",
-                f"限额二（1 日可变现比例不低于 55%）：满足。1 日可变现市值 {fl(now['v1']):,.2f} 港元，比例 {pc(now['p1'])}。",
-                f"限额三（3 日可变现比例不低于 85%）：不满足。3 日可变现市值 {fl(now['v3']):,.2f} 港元，比例 {pc(now['p3'])}。",
+            ("结论", [f"{verdict}。30% 赎回情景下，每只股票按同样比例卖出需要 {key['days']} 个交易日，落在 4 至 5 个交易日一档。"]),
+            ("30% 赎回情景", [
+                f"瓶颈是云顶新耀（1952.HK）。持股 {x['shares']:,} 股，30% 是 {sell:,} 股；日可变现量 {x['cap']:,} 股，3 天只能卖 {3 * x['cap']:,} 股，要 4 天。",
+                "其余十一只股票 3 天之内都能卖完各自的 30%。",
             ]),
-            ("整改后", [
-                f"三只股票合计减持市值 {fl(cut_value):,.2f} 港元，组合总市值降到 {fl(fixed['total']):,.2f} 港元。",
-                f"每只股票的变现天数都不超过 5 个交易日。1 日可变现比例 {pc(fixed['p1'])}，3 日可变现比例 {pc(fixed['p3'])}，三条限额都满足。",
+            ("其余三档", ["；".join(f"{k}% 赎回需要 {sc[k]['days']} 天，瓶颈是{'、'.join(r['name'] for r in sc[k]['who'])}" for k in (10, 20, 50)) + "。这三档只作参考。"]),
+            ("持仓变现能力", [
+                f"组合总市值 {fl(total):,.2f} 港元。" + "，".join(f"{n} 日可变现比例 {pc(lad[n]['p'])}" for n in LADDER) + "。",
+                f"全部变现需要 {full_days} 个交易日，最慢的是{'、'.join(r['name'] for r in slow)}。",
             ]),
             ("两处容易看漏的地方", [
-                f"科伦博泰生物-B 的 ADV20 是 {fl(kl['adv20']):,.2f} 股，ADV60 是 {fl(kl['adv60']):,.2f} 股，近期成交放大。按口径取较小的 ADV60，日可变现量 {kl['cap']:,} 股，变现天数 {kl['days']} 天，超限。",
-                f"云顶新耀的 ADV20 是 {fl(x['adv20']):,.2f} 股，ADV60 是 {fl(x['adv60']):,.2f} 股，近期成交萎缩。按口径取较小的 ADV20，日可变现量 {x['cap']:,} 股，变现天数 {x['days']} 天，超限。",
+                f"云顶新耀的 ADV20 是 {fl(x['adv20']):,.2f} 股，ADV60 是 {fl(x['adv60']):,.2f} 股，近期成交萎缩。按口径取较小的 ADV20，日可变现量 {x['cap']:,} 股。"
+                f"只用 ADV60 时日可变现量是 {w60[2]['cap']:,} 股，30% 赎回会算成 {w60[0]['days']} 天，结论错成{w60[1]}。",
+                f"科伦博泰生物-B 的 ADV20 是 {fl(kl['adv20']):,.2f} 股，ADV60 是 {fl(kl['adv60']):,.2f} 股，近期成交放大。按口径取较小的 ADV60，日可变现量 {kl['cap']:,} 股，变现天数 {kl['days']} 天。",
             ]),
             ("在线数据", [
                 "研究部的快照没有收录云顶新耀。它的日线通过 US Stocks MCP 查询，代码 1952.HK。返回的日期是 UTC 时间，加 8 小时后才是香港的交易日；"
-                f"返回期间内没有分红和拆分，收盘价和成交量都没有调整。基准日 {BASE} 收盘 {fl(x['close']):.2f} 港元。",
+                f"返回期间内没有分红和拆分，收盘价和成交量都没有调整。基准日 {BASE} 收盘 {fl(x['close']):.2f} 港元，市值 {fl(x['value']):,.2f} 港元。",
             ]),
-            ("对应材料", ["十二只股票的日均量、变现天数和减持股数见《港股持仓流动性测算表.xlsx》的「持仓流动性」，现状和整改后的可变现比例见「组合变现比例」，"
-                      "云顶新耀的成交量和查询信息见「在线数据」。两份文件的结论、超限股票、减持股数和可变现比例相同。"]),
+            ("对应材料", ["十二只股票的日均量和变现天数见《港股持仓变现能力测算表.xlsx》的「持仓变现能力」，可变现比例见「变现阶梯」，四档赎回的所需天数和瓶颈股票见「赎回情景」，"
+                      "云顶新耀的成交量和查询信息见「在线数据」。两份文件的结论、所需天数、瓶颈股票和可变现比例相同。"]),
         ],
     )
-    print("查询时间", rec["查询时间"], len(m), "行", m.index[0], m.index[-1], "减持市值", float(cut_value))
+    print("查询时间", rec["查询时间"], len(m), "行", m.index[0], m.index[-1], "20日起", last20.index[0], "60日起", first60)
 
 
 if __name__ == "__main__":
