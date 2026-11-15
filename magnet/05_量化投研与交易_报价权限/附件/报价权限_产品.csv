@@ -1,0 +1,5 @@
+product_code,product_name,cap_wan,cross
+P1,国债期货,500,N
+P2,股指期权,200,Y
+P3,商品期权,300,Y
+P4,利率互换,800,N
