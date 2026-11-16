@@ -9,8 +9,9 @@ office-expert/review-compare/review.json
 RSI-*.pdf
 张先生*.pdf
 
-# Magnet 上传包和分钟行情太大，规则与文稿仍入库
+# Magnet 上传包和分钟行情太大，规则与文稿仍入库；ALE 的 ZIP 由 prepare.py 重新打包
 magnet/**/*.zip
+ALE/**/*.zip
 magnet/**/A01_gbpusd_1m.csv
 magnet/**/GBPUSD_1min_*.csv
 magnet/**/考试账户_QQQ_1min.csv
