@@ -15,3 +15,6 @@ ALE/**/*.zip
 magnet/**/A01_gbpusd_1m.csv
 magnet/**/GBPUSD_1min_*.csv
 magnet/**/考试账户_QQQ_1min.csv
+magnet/**/沪金午休_沪金5分钟线_*.csv
+magnet/**/沪金午休_伦敦金午休1分钟线.csv
+magnet/**/商品跨期_*合约日线.csv
