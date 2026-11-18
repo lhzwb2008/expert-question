@@ -31,7 +31,6 @@
   const tagNames = new Set([
     "一级场景",
     "二级场景",
-    "题型",
     "标签",
     "tag",
     "tags",
@@ -62,6 +61,7 @@
   const fixedEntities = () => [
     { id: "question", name: "题目题干", type: "fixed" },
     { id: "tags", name: "题目 tag", type: "fixed" },
+    { id: "case-rubric", name: "题目 rubric", type: "fixed" },
   ];
   const modelRole = (role) =>
     /^(?:视频|图片|模型回答|模型结果|产物)/.test(role)
@@ -73,14 +73,19 @@
           : "人评";
   const roleGroup = (role) =>
     role === "产物" ? groups[0] : role === "rubric" ? groups[3] : groups[1];
+  const workRole = role => /结果/.test(role) ? '结果' : /日期/.test(role) ? '日期' : /状态/.test(role) ? '状态' : /备注/.test(role) ? '备注' : /人员|同学|人$/.test(role) ? '人员' : role;
+  const workKind = name => /质检|复核/.test(name) ? 'quality' : /标注/.test(name) ? 'annotation' : '';
   function describe(header) {
     const name = String(header || "").trim(),
       n = normalize(name);
     if (!name || name === "标注结果") return null;
+    if (["rubric", "case rubric", "case_rubric", "题目rubric", "题目 rubric"].includes(n))
+      return { entityId: "case-rubric", role: "题目rubric", group: groups[3] };
+    if (n === "第三期题号") return { entityId: "tags", role: "题目ID", group: groups[0] };
+    if (n === "prompt中文") return { entityId: "question", role: "Prompt", group: groups[0] };
     if (identityNames.has(n))
       return { entityId: "tags", role: "题目ID", group: groups[0] };
-    if (["题目类型", "question type", "question_type"].includes(n))
-      return { entityId: "tags", role: "题目类型", group: groups[0] };
+    if (["题型", "题目类型", "question type", "question_type"].includes(n)) return null;
     if (tagNames.has(n) || /^标签[-_ :：]/.test(n))
       return { entityId: "tags", role: name, group: groups[0] };
     if (["prompt", "题干", "问题描述"].includes(n))
@@ -103,33 +108,20 @@
         role = modelRole(normalize(model[2]));
       return { entity, entityId: entity.id, role, group: roleGroup(role) };
     }
-    let work = name.match(
-      /^(.+?)(?:\s*[-_·:：]\s*|\s+)(人员|标注同学|质检同学|状态|标注状态|质检状态|备注|标注备注|质检备注|评分结果)$/,
-    );
+    let work = name.match(/^(.+?)(?:\s*[-_·:：]\s*|\s+)(人员|人|结果|日期|状态|备注|评分结果|标注同学|质检同学|标注人员|质检人员|标注人|质检人|标注结果|质检结果|标注日期|质检日期|标注状态|质检状态|标注备注|质检备注)$/);
     work ||= name.match(/^(.+组(?:\s*\d+)?)(人员|状态|备注)$/);
     if (!work) {
-      const simple = name.match(/^(标注|质检)(同学|人员|状态|备注)$/);
+      const simple = name.match(/^(标注|质检)(同学|人员|人|日期|状态|备注|结果)$/);
       if (simple) work = [name, `${simple[1]}组`, simple[2]];
     }
     if (work) {
-      const entity = {
-        id: `work:${normalize(work[1])}`,
-        name: work[1].trim(),
-        type: "work",
-      };
-      const role = /同学|人员/.test(work[2])
-        ? "人员"
-        : /状态/.test(work[2])
-          ? "状态"
-          : /备注/.test(work[2])
-            ? "备注"
-            : "评分结果";
-      return {
-        entity,
-        entityId: entity.id,
-        role,
-        group: role === "评分结果" ? groups[1] : groups[2],
-      };
+      let entityName = work[1].trim();
+      const suffixKind = workKind(work[2]);
+      const kind = workKind(entityName) || suffixKind;
+      if (!workKind(entityName) && suffixKind) entityName += suffixKind === 'quality' ? ' · 质检' : ' · 标注';
+      const entity = {id: `work:${normalize(entityName)}`, name: entityName, type: 'work', workType: kind};
+      const role = workRole(work[2]);
+      return {entity,entityId:entity.id,role,group:role === '结果' ? groups[1] : groups[2]};
     }
     return null;
   }
@@ -155,6 +147,13 @@
   }
   function upgrade(input, row) {
     const config = clone(input);
+    const oldTypeId=config.questionTypeFieldId;
+    delete config.questionTypeFieldId;
+    config.fields=(config.fields||[]).filter(f=>f.mappingPurpose!=='question-type'&&(
+      !['题型','题目类型','question type','question_type'].includes(normalize(f.source?.header||f.label)) ||
+      (f.entityId==='tags'&&f.manual===true)
+    ));
+    for(const f of config.fields)if(f.id===oldTypeId&&f.role==='题目类型')f.role=describe(f.source?.header||'')?.role||f.source?.header||f.label;
     config.entities ||= [];
     for (const fixed of fixedEntities())
       if (!config.entities.some((e) => e.id === fixed.id))
@@ -167,7 +166,6 @@
     // Migrate legacy labels, not table-specific model/header exceptions.
     for (const field of config.fields) {
       if (field.id === config.identityFieldId) field.role = "题目ID";
-      if (field.id === config.questionTypeFieldId) field.role = "题目类型";
       if (
         field.entityId &&
         config.entities.some((e) => e.id === field.entityId)
@@ -193,6 +191,22 @@
             ? "tags"
             : info?.entityId || "question";
         field.role ||= info?.role || field.label;
+      }
+    }
+    for (const entity of [...config.entities].filter(e => e.type === 'work')) {
+      const fields = config.fields.filter(f => f.entityId === entity.id);
+      const kinds = new Set(fields.map(f => workKind(f.role || '')).filter(Boolean));
+      if (kinds.size > 1) {
+        const originalName = entity.name;
+        entity.name = originalName + ' · 标注'; entity.workType = 'annotation';
+        const quality = { ...entity, id: entity.id + ':quality', name: originalName + ' · 质检', workType: 'quality' };
+        if (!config.entities.some(e => e.id === quality.id)) config.entities.push(quality);
+        for (const field of fields) if (workKind(field.role || '') === 'quality') field.entityId = quality.id;
+      } else if (!entity.workType) entity.workType = [...kinds][0] || workKind(entity.name);
+      for (const field of fields) {
+        field.role = workRole(field.role || field.label);
+        field.group = field.role === '结果' ? groups[1] : groups[2];
+        field.label = `${config.entities.find(e => e.id === field.entityId).name} · ${field.role}`;
       }
     }
     config.fields = config.fields.filter(
@@ -229,17 +243,8 @@
     );
     if (!config.identityFieldId && identities.length === 1)
       config.identityFieldId = identities[0].id;
-    if (!Object.hasOwn(config, "questionTypeFieldId")) {
-      const direct = config.fields.filter(
-        (f) => f.source && f.role === "题目类型",
-      );
-      const fallback = config.fields.filter(
-        (f) => f.source && normalize(f.source.header) === "一级场景",
-      );
-      const choices = direct.length ? direct : fallback;
-      config.questionTypeFieldId = choices.length === 1 ? choices[0].id : "";
-    }
   }
+
   function reconcile(row, input, { suggest = false } = {}) {
     if (input.table !== key(row))
       throw new Error("映射属于其他工作表，请重新打开当前表的映射设置。");
@@ -426,8 +431,40 @@
     )
       throw new Error("请填写业务字段名称和分组。");
     if (!read(row, config).length) throw new Error("请至少绑定一个源列。");
+    for (const entity of config.entities || []) {
+      const fields = config.fields.filter(f => f.entityId === entity.id && f.source);
+      const roles = entity.id === 'case-rubric' ? ['题目rubric'] : entity.type === 'work' ? ['人员','结果','日期','状态','备注'] : [];
+      for (const role of roles) if (fields.filter(f => f.role === role).length > 1) throw new Error(`${entity.name}的${role}只能绑定一个源列。`);
+      if (entity.type !== 'work') continue;
+      if (!['annotation','quality'].includes(entity.workType)) throw new Error(`${entity.name}请选择标注或质检类型。`);
+      if (!fields.some(f => f.role === '人员') || !fields.some(f => f.role === '结果')) throw new Error(`${entity.name}至少需要绑定人员和结果。`);
+      const target = fields.find(f => f.role === '结果');
+      if (config.fields.some(f => f !== target && f.source?.index === target.source.index)) throw new Error('工作项结果列必须独立，不能与其他角色共用。');
+      if (entity.annotationWorkId) {
+        const origin = config.entities.find(e => e.id === entity.annotationWorkId && e.type === 'work' && e.workType === 'annotation');
+        if (entity.workType !== 'quality' || !origin) throw new Error('质检关联的标注工作项无效。');
+      }
+    }
     await store.set({ [key(row)]: config });
     return config;
+  }
+  function hasMachineResults(row, config) {
+    return Boolean(config && config.table === key(row) && config.fields?.some(f =>
+      f.role === '机评' && valid(row, f.source) &&
+      config.entities?.some(e => e.id === f.entityId && e.type === 'model')));
+  }
+  function workContext(row, config, workId) {
+    const work = config.entities?.find(e => e.id === workId && e.type === 'work');
+    if (!work) throw new Error('工作项不存在。');
+    const fields = read(row, config);
+    const find = (entityId, role) => fields.find(item => {
+      const field = config.fields.find(f => f.id === item.id);
+      return field.entityId === entityId && field.role === role;
+    }) || null;
+    return {work, stage:work.workType, rubric:find('case-rubric','题目rubric'),
+      models:config.entities.filter(e => e.type === 'model'),
+      target:find(workId,'结果'), person:find(workId,'人员'), date:find(workId,'日期'), status:find(workId,'状态'),
+      annotationSource:work.annotationWorkId ? find(work.annotationWorkId,'结果') : null};
   }
   function publicGroups(row, config) {
     const result = new Map();
@@ -435,8 +472,7 @@
       "题目ID",
       "一级场景",
       "二级场景",
-      "题型",
-      "参考素材类型（多选）",
+        "参考素材类型（多选）",
       "技术栈",
       "分镜",
       "标准解法提供方式",
@@ -459,7 +495,7 @@
           /视频链接|图片链接|模型回答|模型结果/.test(item.source.header));
       const stem =
         !item.isIdentity &&
-        (entity?.id === "question" ||
+        ((entity?.id === "question" && field.role !== "题目rubric") ||
           (!entity &&
             !tags.has(field.label) &&
             field.group === "题目与素材" &&
@@ -539,5 +575,7 @@
     read,
     save,
     publicGroups,
+    hasMachineResults,
+    workContext,
   });
 })();

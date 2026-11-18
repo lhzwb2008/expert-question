@@ -37,16 +37,10 @@
     constructor(context) {
       super(context);
       this.writeCell = context.onWrite;
-      const shared=globalThis.__cyleHumanReviewStateV1 ||= {sessions:new Map(),templateChoices:new Map()};
+      const shared=globalThis.__cyleHumanReviewStateV1 ||= {sessions:new Map()};
       this.sessions = shared.sessions;
-      this.templateChoices = shared.templateChoices;
       this.commits = shared.commits ||= new Map();
       this.commitQueues = shared.commitQueues ||= new Map();
-      this.rubricChanged = () => {
-        this.needsRefresh = true;
-        if (this.active !== false) this.update();
-      };
-      document.addEventListener("cyle:human-rubric-saved", this.rubricChanged);
       this.closeReviewMenus = event => {
         const path = event.composedPath();
         this.details?.querySelectorAll('.human-menu[open]').forEach(menu => {
@@ -66,7 +60,7 @@
           return;
         if (event.type === "focusin" && this.evidencePointerDown) return;
         const path = event.composedPath();
-        if (path.includes(this.scroll) || path.includes(this.pickHint)) return;
+        if (path.includes(this.scroll) || path.includes(this.pickHint) || this.isEvidenceEditorEvent?.(event)) return;
         this.commitEvidencePick();
       };
       // Pointer focus precedes click: defer confirmation to click so hiding the
@@ -121,7 +115,6 @@
         this.row.rowIndex,
         identity ? raw(identity.cell) : "",
       ]);
-      if (target.templateId) this.templateChoices.set(key, target.templateId);
       globalThis.__cyleSelectedModelVideoV1 = {
         tableKey: this.row.tableKey,
         rowIndex: this.row.rowIndex,
@@ -147,7 +140,9 @@
         row = this.row;
       const M = globalThis.__cyleFieldMappingV1,
         D = globalThis.__cyleDraftServiceV1;
-      const rubric = await globalThis.__cyleHumanRubricV1.load();
+      let rubricError='';
+      this.template=null;
+      try{this.template=globalThis.__cyleQuestionRubricV1.load(row,mapping);}catch(error){rubricError=error.message;}
       if (revision !== this.revision) return;
       this.humanSources = fields.filter((item) => {
         const field = mapping.fields.find((f) => f.id === item.id);
@@ -165,30 +160,6 @@
         row.rowIndex,
         identity ? raw(identity.cell) : "",
       ]);
-      // Existing mapped tags supply type values; never assume a physical column number.
-      const tagValues = mapped
-        .filter((item) => {
-          const field = mapping.fields.find((f) => f.id === item.id);
-          if (Object.hasOwn(mapping, "questionTypeFieldId"))
-            return item.id === mapping.questionTypeFieldId;
-          return (
-            field.entityId === "tags" ||
-            ["一级场景", "题目类型", "题型"].includes(field.role || field.label)
-          );
-        })
-        .flatMap((item) => {
-          const value = item.cell.value ?? item.cell.rawValue;
-          return (Array.isArray(value) ? value : [value])
-            .filter((v) => typeof v === "string")
-            .map((v) => v.trim());
-        });
-      const matches = rubric.templates.filter((t) =>
-        tagValues.includes(t.question_type.trim()),
-      );
-      const chosen = this.templateChoices.get(this.questionKey);
-      this.template =
-        rubric.templates.find((t) => t.id === chosen) ||
-        (matches.length === 1 ? matches[0] : null);
       this.sourceResult = null;
       this.prefillError = "";
       let prefilled = null;
@@ -211,10 +182,6 @@
           );
         prefilled = documents[0] || null;
         this.sourceResult = prefilled?.result || null;
-        if (!this.template && prefilled)
-          this.template =
-            rubric.templates.find((t) => t.id === prefilled.result.rubric_id) ||
-            null;
       } catch (error) {
         this.prefillError = error.message;
       }
@@ -362,55 +329,8 @@
         this.view = "all";
       this.renderTimeline();
       this.scoreBar.hidden = true;
-      const style = el("style");
-      style.textContent =
-        `
-        .human-toolbar{display:flex;align-items:center;gap:10px;padding:8px 12px;flex-wrap:wrap;border-bottom:1px solid var(--pet-border);font-size:12px}
-        .human-toolbar select{max-width:260px;padding:6px 8px;background:var(--pet-input);color:var(--pet-text);border:1px solid var(--pet-border);border-radius:6px;font:inherit}
-        .human-group>h3{font-size:12px;color:var(--pet-muted);margin:22px 0 8px;font-weight:600}.human-card{border:0;border-radius:0;overflow:visible;padding:12px 0 18px;border-bottom:1px solid var(--pet-border);margin:0;background:transparent}
-        .human-card>header{padding:0;background:transparent;display:flex;gap:8px;align-items:center;margin-bottom:10px}.human-card h4{font-size:13px;margin:0;flex:1;color:var(--pet-text);font-weight:600}.human-meta{font-size:11px;color:var(--pet-muted)}
-        .human-title{cursor:help}.human-rubric-tip{position:fixed;inset:auto;margin:0;box-sizing:border-box;max-height:300px;overflow:auto;padding:14px 16px;border:1px solid var(--pet-border);border-radius:8px;background:var(--pet-raised);color:var(--pet-text);white-space:pre-wrap;line-height:1.7;font-size:12px;font-family:inherit;box-shadow:0 6px 24px #0005}.human-time-preview{position:absolute;top:32px;height:28px;border:1px dashed var(--pet-accent);background:var(--pet-soft);pointer-events:none;z-index:6}
-        .human-menu{position:relative;margin:0;padding:0}.human-menu summary{cursor:pointer;list-style:none;font-size:12px;padding:4px 7px;border-radius:5px}.human-menu summary::-webkit-details-marker{display:none}.human-menu summary:hover{background:var(--pet-raised)}.human-menu-options{position:absolute;right:0;top:100%;min-width:104px;z-index:8;display:flex;flex-direction:column;padding:5px;background:var(--pet-raised);border:1px solid var(--pet-border);border-radius:7px;box-shadow:0 4px 16px #0003}.human-menu-options button{color:var(--pet-text);border:0;background:transparent;text-align:left;white-space:nowrap;font-size:12px}.human-menu-options button:hover{background:var(--pet-soft)}
-        .human-score summary{color:var(--score-color);font-weight:600;background:color-mix(in srgb,var(--score-color) 8%,transparent);white-space:nowrap}.human-score summary::after{content:' ▾';font-size:9px;opacity:.6}
-        .human-annotation{padding:9px 10px;margin:2px 0;border-radius:5px}.human-annotation-main{display:flex;gap:10px;align-items:flex-start}.human-annotation-content{flex:1;min-width:0}.human-annotation-text{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.75;font-size:13px;min-height:22px}.human-annotation-text:empty{color:var(--pet-muted)}
-        .human-judgment{flex-shrink:0;color:var(--pet-muted);font-size:11px}.human-judgment summary{font-size:11px;padding:3px 6px}.human-judgment .human-menu-options{left:0;right:auto}.human-judgment[data-judgment=true]{color:var(--pet-green)}.human-judgment[data-judgment=false]{color:var(--pet-red)}
-        .human-row-actions{display:flex;gap:3px;opacity:0;flex-shrink:0}.human-row-actions button,.human-add{font-size:11px;border:0;background:transparent;color:var(--pet-muted);padding:4px 6px}.human-annotation:hover .human-row-actions,.human-annotation:focus-within .human-row-actions{opacity:1}.human-row-actions button:hover,.human-add:hover{color:var(--pet-accent)}
-        .human-time-tags{display:flex;align-items:center;gap:5px;margin:5px 0 0 54px;flex-wrap:wrap}.human-time-tag{font-size:11px;background:var(--pet-raised);border:0;color:var(--pet-muted);padding:3px 7px}.human-time-edit{display:none;font-size:10px;padding:2px 4px;border:0;background:transparent;color:var(--pet-muted);opacity:0}.human-annotation:hover .human-time-edit,.human-annotation:focus-within .human-time-edit{display:inline-block;opacity:1}.human-time-tag.is-selected{color:var(--pet-accent);background:color-mix(in srgb,var(--pet-accent) 10%,transparent)}.human-annotation.is-evidence-selected{background:transparent}
-        .human-card.is-evidence-selected{outline:0;box-shadow:inset 2px 0 color-mix(in srgb,var(--pet-accent) 65%,transparent);background:color-mix(in srgb,var(--pet-accent) 4%,transparent);border-radius:6px}.human-card{padding-left:10px;padding-right:10px}.human-annotation-text{cursor:pointer}.human-prefill-hint{font-size:10px;color:var(--pet-muted);padding:3px 8px}.human-note{white-space:pre-wrap;font-size:12px;color:var(--pet-muted);margin:8px 10px;padding-left:9px;border-left:2px solid var(--pet-border)}.human-add{margin:6px 0 0 54px}
-        .human-annotation textarea,.human-note textarea{box-sizing:border-box;width:100%;min-height:80px;resize:vertical;padding:8px;font:inherit;line-height:1.7;background:var(--pet-input);color:var(--pet-text);border:1px solid var(--pet-border);border-radius:5px}.human-history{margin:18px 0;color:var(--pet-muted)}.human-history section{margin:14px 0}.human-history p{white-space:pre-wrap}
-        .human-pick{display:flex;align-items:center;gap:8px;padding:6px 12px;background:var(--pet-soft);font-size:12px;flex-wrap:wrap}.human-pick-target{font-weight:600}.human-pick output{font-variant-numeric:tabular-nums}.human-pick-help{font-size:11px;color:var(--pet-muted);flex:1}.human-annotation.is-editing-time{outline:1px solid var(--pet-accent);background:var(--pet-soft)}.human-add-time{background:transparent;border:0;color:var(--pet-muted);font-size:11px;padding:3px 5px}.human-add-time:hover{color:var(--pet-accent)}
-        @media(hover:none){.human-row-actions{opacity:1}.human-time-edit{display:inline-block;opacity:1}}@media(max-width:650px){.human-annotation-main{flex-wrap:wrap}.human-row-actions{margin-left:54px}.human-time-tags{margin-left:0}}
-        .human-footer{flex-shrink:0}.human-footer span{flex:1;font-size:12px;color:var(--pet-muted)}.human-original{margin:12px 0}.human-original pre{white-space:pre-wrap;overflow-wrap:anywhere}
-
-      ` + globalThis.__cyleComposerStylesV1;
-      this.body.append(style);
-      if (!this.template) {
-        const toolbar = el("div", "", "human-toolbar");
-        const label = el("label", "评估模板 "),
-          select = el("select");
-        select.setAttribute("aria-label", "人评评估模板");
-        const empty = el(
-          "option",
-          matches.length > 1
-            ? "题目 tag 匹配多个模板，请选择"
-            : "未匹配模板，请选择",
-        );
-        empty.value = "";
-        select.append(empty);
-        for (const template of rubric.templates) {
-          const option = el("option", template.name);
-          option.value = template.id;
-          select.append(option);
-        }
-        select.value = this.template?.id || "";
-        select.addEventListener("change", () => {
-          this.templateChoices.set(this.questionKey, select.value);
-          this.update();
-        });
-        label.append(select);
-        toolbar.append(label);
-        this.body.append(toolbar);
-      }
+      this.appendHumanStyles();
+      if(!this.template){const notice=el('p',rubricError||'本题尚未绑定题目 rubric。','empty');notice.dataset.state='question-rubric-unavailable';this.body.append(notice);}
       this.tabBar = el("nav", "", "evaluation-tabs");
       this.tabBar.setAttribute("aria-label", "人评子栏目");
       this.body.append(this.tabBar);
@@ -442,6 +362,28 @@
         .join(",");
     }
 
+    appendHumanStyles() {
+      const style = el("style");
+      style.textContent =
+        `
+        .human-group>h3{font-size:12px;color:var(--pet-muted);margin:22px 0 8px;font-weight:600}.human-card{border:0;border-radius:0;overflow:visible;padding:12px 0 18px;border-bottom:1px solid var(--pet-border);margin:0;background:transparent}
+        .human-card>header{padding:0;background:transparent;display:flex;gap:8px;align-items:center;margin-bottom:10px}.human-card h4{font-size:13px;margin:0;flex:1;color:var(--pet-text);font-weight:600}.human-meta{font-size:11px;color:var(--pet-muted)}
+        .human-title{cursor:text}.human-title[tabindex]{cursor:help}.human-rubric-tip{position:fixed;inset:auto;margin:0;box-sizing:border-box;max-height:300px;overflow:auto;padding:14px 16px;border:1px solid var(--pet-border);border-radius:8px;background:var(--pet-raised);color:var(--pet-text);white-space:pre-wrap;line-height:1.7;font-size:12px;font-family:inherit;box-shadow:0 6px 24px #0005}.human-time-preview{position:absolute;top:32px;height:28px;border:1px dashed var(--pet-accent);background:var(--pet-soft);pointer-events:none;z-index:6}
+        .human-menu{position:relative;margin:0;padding:0}.human-menu summary{cursor:pointer;list-style:none;font-size:12px;padding:4px 7px;border-radius:5px}.human-menu summary::-webkit-details-marker{display:none}.human-menu summary:hover{background:var(--pet-raised)}.human-menu-options{position:absolute;right:0;top:100%;min-width:104px;z-index:8;display:flex;flex-direction:column;padding:5px;background:var(--pet-raised);border:1px solid var(--pet-border);border-radius:7px;box-shadow:0 4px 16px #0003}.human-menu-options button{color:var(--pet-text);border:0;background:transparent;text-align:left;white-space:nowrap;font-size:12px}.human-menu-options button:hover{background:var(--pet-soft)}
+        .human-score summary{color:var(--score-color);font-weight:600;background:color-mix(in srgb,var(--score-color) 8%,transparent);white-space:nowrap}.human-score summary::after{content:' ▾';font-size:9px;opacity:.6}
+        .human-annotation{padding:9px 10px;margin:2px 0;border-radius:5px}.human-annotation-main{display:flex;gap:10px;align-items:flex-start}.human-annotation-content{flex:1;min-width:0}.human-annotation-text{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.75;font-size:13px;min-height:22px}.human-annotation-text:empty{color:var(--pet-muted)}
+        .human-judgment{flex-shrink:0;color:var(--pet-muted);font-size:11px}.human-judgment summary{font-size:11px;padding:3px 6px}.human-judgment .human-menu-options{left:0;right:auto}.human-judgment[data-judgment=true]{color:var(--pet-green)}.human-judgment[data-judgment=false]{color:var(--pet-red)}
+        .human-row-actions{display:flex;gap:3px;opacity:0;flex-shrink:0}.human-row-actions button,.human-add{font-size:11px;border:0;background:transparent;color:var(--pet-muted);padding:4px 6px}.human-annotation:hover .human-row-actions,.human-annotation:focus-within .human-row-actions{opacity:1}.human-row-actions button:hover,.human-add:hover{color:var(--pet-accent)}
+        .human-time-tags{display:flex;align-items:center;gap:5px;margin:5px 0 0 54px;flex-wrap:wrap}.human-time-tag{font-size:11px;background:var(--pet-raised);border:0;color:var(--pet-muted);padding:3px 7px}.human-time-edit{display:none;font-size:10px;padding:2px 4px;border:0;background:transparent;color:var(--pet-muted);opacity:0}.human-annotation:hover .human-time-edit,.human-annotation:focus-within .human-time-edit{display:inline-block;opacity:1}.human-time-tag.is-selected{color:var(--pet-accent);background:color-mix(in srgb,var(--pet-accent) 10%,transparent)}.human-annotation.is-evidence-selected{background:transparent}
+        .human-card.is-evidence-selected{outline:0;box-shadow:inset 2px 0 color-mix(in srgb,var(--pet-accent) 65%,transparent);background:color-mix(in srgb,var(--pet-accent) 4%,transparent);border-radius:6px}.human-card{padding-left:10px;padding-right:10px}.human-annotation-text{cursor:pointer}.human-prefill-hint{font-size:10px;color:var(--pet-muted);padding:3px 8px}.human-note{white-space:pre-wrap;font-size:12px;color:var(--pet-muted);margin:8px 10px;padding-left:9px;border-left:2px solid var(--pet-border)}.human-add{margin:6px 0 0 54px}
+        .human-annotation textarea,.human-note textarea{box-sizing:border-box;width:100%;min-height:80px;resize:vertical;padding:8px;font:inherit;line-height:1.7;background:var(--pet-input);color:var(--pet-text);border:1px solid var(--pet-border);border-radius:5px}.human-history{margin:18px 0;color:var(--pet-muted)}.human-history section{margin:14px 0}.human-history p{white-space:pre-wrap}
+        .human-pick{display:flex;align-items:center;gap:8px;padding:6px 12px;background:var(--pet-soft);font-size:12px;flex-wrap:wrap}.human-pick-target{font-weight:600}.human-pick output{font-variant-numeric:tabular-nums}.human-pick-help{font-size:11px;color:var(--pet-muted);flex:1}.human-annotation.is-editing-time{outline:1px solid var(--pet-accent);background:var(--pet-soft)}.human-add-time{background:transparent;border:0;color:var(--pet-muted);font-size:11px;padding:3px 5px}.human-add-time:hover{color:var(--pet-accent)}
+        @media(hover:none){.human-row-actions{opacity:1}.human-time-edit{display:inline-block;opacity:1}}@media(max-width:650px){.human-annotation-main{flex-wrap:wrap}.human-row-actions{margin-left:54px}.human-time-tags{margin-left:0}}
+        .human-footer{flex-shrink:0}.human-footer span{flex:1;font-size:12px;color:var(--pet-muted)}.human-original{margin:12px 0}.human-original pre{white-space:pre-wrap;overflow-wrap:anywhere}
+
+      ` + globalThis.__cyleComposerStylesV1;
+      this.body.append(style);
+    }
     renderTabs() {
       this.tabBar.replaceChildren();
       for (const [id, label] of [
@@ -517,7 +459,7 @@
         !!this.prefillError ||
         !this.humanSources.length;
       const status = !state
-        ? "请选择评估模板"
+        ? "请配置当前题目的 rubric"
         : state.conflict
           ? "题目、人评目标或原人评内容已变化，保留旧草稿，暂不覆盖"
           : state.submitting
@@ -544,7 +486,7 @@
       if (!context.identity || !raw(context.identity.cell).trim()) return fail('请先映射有效的题目 ID，再回写人评。');
       if (raw(target).trim() && !this.sourceResult) return fail('原人评内容不是可识别的 human-eval/1，已保留原文，不能直接覆盖。');
       const snapshot = structuredClone(state.answers);
-      const base = this.sourceResult || {schema:'human-eval/1',case_id:raw(context.identity.cell),model:context.model.name,rubric_id:this.template.id,criteria:[]};
+      const base = this.sourceResult || {schema:'human-eval/1',case_id:raw(context.identity.cell),model:context.model.name,rubric_id:this.template.id,rubric_snapshot:this.template.snapshot,criteria:[]};
       let value;
       try {
         const result=globalThis.__cyleHumanResultV1.serialize(base,snapshot);
@@ -802,10 +744,6 @@
       document.removeEventListener("click", this.evidenceBlur, true);
       document.removeEventListener("keyup", this.evidenceBlur, true);
       this.hideRubricTip();
-      document.removeEventListener(
-        "cyle:human-rubric-saved",
-        this.rubricChanged,
-      );
       super.dispose();
     }
   }

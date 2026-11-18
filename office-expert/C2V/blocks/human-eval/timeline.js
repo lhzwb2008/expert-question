@@ -332,7 +332,7 @@
             ...item,
             id: `${item.criterionId}/${item.evidence.annotationId || item.evidence.id}`,
             dimension: groupByCriterion.get(item.criterionId),
-            result: { tier_ceiling: this.answer(item.criterionId)?.score },
+            result: { tier_ceiling: this.timelineScore ? this.timelineScore(item.criterionId) : this.answer(item.criterionId)?.score },
           },
         ],
       }));

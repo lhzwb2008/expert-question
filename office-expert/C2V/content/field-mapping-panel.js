@@ -5,6 +5,8 @@
   const el = (tag, text = '') => { const n = document.createElement(tag); n.textContent = text; return n; };
   const button = (label, action) => { const b = el('button', label); b.type = 'button'; b.addEventListener('click', action); return b; };
   function create({ parent, getRow, onApply, embedded = false }) {
+    const NOTICE_DURATION = 3000;
+    let noticeTimer = null, lastDraftState = '';
     let row, draft, opened = false, busy = false, request = 0, savedSnapshot = null, initialSnapshot = null, saveResult = null, saveTimer = null, saveControl = null, saving = false;
     const host = el(embedded ? 'div' : 'dialog'); host.className = 'cyle-field-mapping-host' + (embedded ? '' : ' gtm-draft-center');
     host.setAttribute('aria-label','字段映射设置');
@@ -50,6 +52,17 @@
       .selected-list,.mapping-header-list,.mapping-projects{scrollbar-width:thin;scrollbar-color:var(--pet-border,#465564) transparent;scroll-padding:8px}
 
 
+      .mapping-slot{display:grid;grid-template-columns:66px minmax(0,1fr) 26px;align-items:center;gap:10px;min-height:46px;padding:5px 8px;border-bottom:1px solid var(--pet-border);border-radius:0}
+      .mapping-slot.is-active{background:var(--pet-soft);box-shadow:inset 2px 0 var(--pet-accent)}
+      .slot-label{font-size:12px;color:var(--pet-muted);cursor:pointer}
+      .mapping-slot.is-active .slot-label{color:var(--pet-text)}
+      .mapping-slot .slot-source{width:100%;min-height:34px;padding:6px 0;text-align:left;border:0;background:transparent;font-size:12px;font-weight:400;overflow-wrap:anywhere}
+      .mapping-slot .slot-clear{width:26px;min-height:26px;height:26px;border:0;background:transparent;color:var(--pet-muted);padding:0;font-size:16px}
+      .mapping-slot .slot-clear:disabled{visibility:hidden}
+      .mapping-work-type{display:flex;gap:4px;margin:0 0 12px}
+      .mapping-work-type button{min-height:26px;padding:3px 10px;font-size:12px;background:transparent}
+      .mapping-work-type button.active{background:var(--pet-soft);border-color:var(--pet-border);font-weight:600}
+
       @media(max-width:800px){.content{grid-template-columns:160px minmax(0,1fr) minmax(0,1fr)!important}.mapping-projects,.mapping-current,.mapping-headers{padding:12px 10px!important}}
       @media(max-width:650px){.content{gap:8px!important;padding:8px 0!important}}
 
@@ -59,16 +72,17 @@
     const header = el('header'), title = el('h2','字段映射设置'), grow = el('span');grow.className='grow';
     if (!embedded) header.append(title,grow,button('关闭',close)); else header.hidden=true;
     const context = el('p'), message = el('p');context.hidden=true;message.className='message';message.setAttribute('role','status');
+    message.style.cssText='margin:0;min-width:0;max-width:65%;font-size:12px;white-space:normal';
     const nav = el('nav'), content = el('div');content.className='content';const footer=el('footer');
-    panel.append(header,context,nav,message,content,footer);root.append(style,panel);parent.append(host);
+    panel.append(header,context,nav,content,footer);root.append(style,panel);parent.append(host);
     for(const type of ['keydown','keyup','keypress','pointerdown']) host.addEventListener(type,event=>{event.stopPropagation();if(type==='keydown'&&event.key==='Escape'&&!embedded)close();});
-    function close(){clearSaveResult();opened=false;request++;if(embedded)host.hidden=true;else if(host.open)host.close();}
+    function close(){clearNotice();clearSaveResult();opened=false;request++;if(embedded)host.hidden=true;else if(host.open)host.close();}
     host.addEventListener('cancel',event=>{event.preventDefault();close();});
     async function open(){
       const next=getRow();if(!next)throw new Error('请先读取数据行。');
-      const token=++request;opened=true;if(embedded){parent.append(host);host.hidden=false;}else{(document.fullscreenElement||parent).append(host);if(!host.open)host.showModal();}context.textContent='正在加载映射…';content.replaceChildren();footer.replaceChildren();message.textContent='';clearSaveResult();
+      const token=++request;opened=true;if(embedded){parent.append(host);host.hidden=false;}else{(document.fullscreenElement||parent).append(host);if(!host.open)host.showModal();}context.textContent='正在加载映射…';content.replaceChildren();footer.replaceChildren(message);clearNotice();lastDraftState='';clearSaveResult();
       try{const saved=await M.load(next);if(token!==request||!opened)return;row=next;draft=M.clone(saved||M.defaults(row));initialSnapshot=JSON.stringify(draft);savedSnapshot=saved?initialSnapshot:null;render();root.querySelector('input')?.focus();}
-      catch(error){if(token===request)message.textContent=error.message;}
+      catch(error){if(token===request)showNotice(error.message);}
     }
     function setRow(next){
       if(!opened||!row)return;
@@ -76,14 +90,13 @@
       row=next;
       // Keep form edits when only the selected row changes.
       context.textContent=`${row.sheetName||row.sheetId} · 按当前工作表保存；空选项表示不显示`;
-      if(JSON.stringify(draft.headers)!==JSON.stringify(row.headers)){draft=M.reconcile(row,draft).config;message.textContent='表头已更新，失效关联已标出，请核对后保存。';render();}
+      if(JSON.stringify(draft.headers)!==JSON.stringify(row.headers)){draft=M.reconcile(row,draft).config;showNotice('表头已更新，失效关联已标出，请核对后保存。');render();}
     }
     let activeSlot = '', activeProject = 'question', searchText = '';
     function projects() {
-      const list=[{id:'question-type',name:'题目类型',type:'fixed',single:true,fields:[]},{id:'question',name:'题目题干',type:'fixed',fields:[]},{id:'tags',name:'题目 tag',type:'fixed',fields:[]}];
-      const tags=['一级场景','二级场景','题型','参考素材类型（多选）','技术栈','分镜','标准解法提供方式','画幅要求（Prompt口径）','分辨率要求（Prompt口径）','视频时长（秒）'];
+      const list=[{id:'question',name:'题目题干',type:'fixed',fields:[]},{id:'tags',name:'题目 tag',type:'fixed',fields:[]},{id:'case-rubric',name:'题目 rubric',type:'fixed',fields:[]}];
+      const tags=['一级场景','二级场景','参考素材类型（多选）','技术栈','分镜','标准解法提供方式','画幅要求（Prompt口径）','分辨率要求（Prompt口径）','视频时长（秒）'];
       for(const field of draft.fields){
-        if(field.id===draft.questionTypeFieldId){list[0].fields.push(field);if(field.id!==draft.identityFieldId)continue;}
         const saved=draft.entities?.find(e=>e.id===field.entityId);
         const parts=field.label.split(' · ');
         let id='question',name='题目题干',type='fixed';
@@ -96,24 +109,11 @@
       }
       return list;
     }
-    function setQuestionType(index){
-      const previous=draft.fields.find(f=>f.id===draft.questionTypeFieldId);
-      if(previous?.mappingPurpose==='question-type')draft.fields=draft.fields.filter(f=>f!==previous);
-      else if(previous?.role==='题目类型')previous.role=M.describe(previous.source?.header||previous.label)?.role||previous.label;
-      draft.questionTypeFieldId='';
-      if(index===null)return;
-      let field=draft.fields.find(f=>f.entityId==='tags'&&f.id!==draft.identityFieldId&&M.valid(row,f.source)&&f.source.index===index);
-      if(!field){
-        field={id:crypto.randomUUID(),entityId:'tags',mappingPurpose:'question-type',manual:true,role:'题目类型',group:M.groups[0],label:row.headers[index]||M.letter(index),source:M.source(row,index)};
-        draft.fields.push(field);
-      }
-      draft.questionTypeFieldId=field.id;
-    }
     function newProject(type){
       const list=projects(),prefix=type==='model'?'模型':'工作项';let n=1;while(list.some(p=>p.name===`${prefix} ${n}`))n++;
       const name=`${prefix} ${n}`,id=crypto.randomUUID();draft.entities ||= [];
-      draft.entities.push({id,name,type});
-      const roles=type==='model'?[['产物','题目与素材'],['rubric','评分标准'],['机评','评分结果'],['人评','评分结果']]:[['评分结果','评分结果'],['人员','人员与状态'],['状态','人员与状态'],['备注','人员与状态']];
+      draft.entities.push({id,name,type,...(type==='work'?{workType:'annotation'}:{})});
+      const roles=type==='model'?[['产物','题目与素材'],['rubric','评分标准'],['机评','评分结果']]:[['人员','人员与状态'],['结果','评分结果'],['日期','人员与状态'],['状态','人员与状态'],['备注','人员与状态']];
       for(const [role,group] of roles)draft.fields.push({id:crypto.randomUUID(),entityId:id,role,label:`${name} · ${role}`,group,source:null});
       activeProject=id;render();
     }
@@ -123,78 +123,110 @@
       nav.replaceChildren();
       nav.hidden=true;
       const autoButton=button('自动关联',async()=>{
-        if(busy)return;busy=true;message.textContent='正在读取最新表头…';render();
+        if(busy)return;busy=true;showNotice('正在读取最新表头…');render();
         try {
           const current=await chrome.runtime.sendMessage({type:'READ_ACTIVE_ROW'});
           if(!current?.ok)throw new Error(current?.error||'请先读取数据行。');
           if(M.key(current)!==M.key(row))throw new Error('已切换工作表，请重新打开组装。');
           const result=M.autoMap(current,draft);row=current;draft=result.config;
-          message.textContent=`已扫描全表：保留 ${result.stats.kept} 项，修复 ${result.stats.repaired} 项，新增 ${result.stats.added} 项；${result.unassigned.length} 列待分配，${result.issues.length} 项关联待确认。保存后生效。`;
-        }catch(error){message.textContent=error.message;}
+          showNotice(result.issues.length?`有 ${result.issues.length} 项关联待确认`:'已自动关联');
+        }catch(error){showNotice(error.message);}
         finally{busy=false;if(opened)render();}
       });
       content.replaceChildren();content.style.cssText='display:grid;grid-template-columns:minmax(150px,.56fr) minmax(0,1fr) minmax(0,1fr);gap:14px;overflow:hidden;padding:10px 0';
       const projectList=projects();if(!projectList.some(p=>p.id===activeProject))activeProject='question';
       const project=projectList.find(p=>p.id===activeProject);
-      const all=project.fields.map(f=>({id:f.id,label:f.role||f.label,multi:false,fields:[f]}));
-      if(!all.some(x=>x.id===activeSlot))activeSlot=all[0]?.id;
+      const slotMode=project.type==='model'||project.type==='work';
+      const slotRoles=project.type==='model'?['产物','rubric','机评']:['人员','结果','日期','状态','备注'];
+      const slotFields=new Map();
+      if(slotMode)for(const role of slotRoles){
+        let field=project.fields.find(f=>f.role===role&&f.source)||project.fields.find(f=>f.role===role);
+        if(!field){field={id:crypto.randomUUID(),entityId:project.id,role,group:role==='rubric'?'评分标准':role==='产物'?'题目与素材':role==='结果'||role==='机评'?'评分结果':'人员与状态',label:`${project.name} · ${role}`,source:null};draft.fields.push(field);project.fields.push(field);}
+        slotFields.set(role,field);
+      }
+      if(slotMode&&!slotRoles.includes(activeSlot))activeSlot=slotRoles[0];
       const sidebar=el('div');sidebar.className='mapping-projects';sidebar.style.cssText='overflow:auto;min-height:0;border-right:1px solid var(--pet-border,#465564);padding:8px';
       sidebar.append(el('h3','工作项目'));
       for(const p of projectList){
         const line=el('div');line.className='project-row';line.style.cssText='display:flex;gap:4px;margin-bottom:8px';
         let timer;
-        const select=button(p.name,()=>{clearTimeout(timer);timer=setTimeout(()=>{activeProject=p.id;activeSlot='';searchText='';render(p.fields.find(f=>f.source)?.source.index??-1);},220);});
+        const select=button(p.name,()=>{clearTimeout(timer);const choose=()=>{activeProject=p.id;activeSlot='';searchText='';render(p.fields.find(f=>f.source)?.source.index??-1);};if(p.type==='fixed')choose();else timer=setTimeout(choose,220);});
         select.setAttribute('aria-label','选择项目 '+p.name);select.style.cssText='flex:1;min-width:0;text-align:left;overflow-wrap:anywhere';select.classList.toggle('active',p.id===activeProject);line.append(select);
         if(p.type!=='fixed'){
           select.title='双击修改名称';
           select.addEventListener('dblclick',()=>{
             clearTimeout(timer);const input=el('input');input.value=p.name;input.setAttribute('aria-label','编辑项目名称');line.replaceChild(input,select);input.focus();input.select();let done=false;
             const finish=()=>{if(done)return;done=true;const name=input.value.trim();
-              if(!name||projectList.some(x=>x.id!==p.id&&x.name===name)){message.textContent='名称不能为空或与其他项目重复。';render();return;}
+              if(!name||projectList.some(x=>x.id!==p.id&&x.name===name)){showNotice('名称不能为空或与其他项目重复。');render();return;}
               draft.entities ||= [];let entity=draft.entities.find(e=>e.id===p.id);if(!entity){entity={id:p.id,type:p.type};draft.entities.push(entity);}entity.name=name;
               for(const f of p.fields){f.entityId=p.id;f.role ||= f.label.split(' · ').slice(1).join(' · ')||f.label;f.label=`${name} · ${f.role}`;}
               activeProject=p.id;render();
             };
             input.addEventListener('blur',finish);input.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();finish();}if(e.key==='Escape'){done=true;render();}});
           });
-          const remove=button('×',()=>{clearTimeout(timer);draft.fields=draft.fields.filter(f=>!p.fields.includes(f));draft.entities=(draft.entities||[]).filter(e=>e.id!==p.id);if(activeProject===p.id)activeProject='question';render();});remove.setAttribute('aria-label','删除项目 '+p.name);line.append(remove);
+        const remove=button('×',()=>{clearTimeout(timer);draft.fields=draft.fields.filter(f=>!p.fields.includes(f));draft.entities=(draft.entities||[]).filter(e=>e.id!==p.id);if(activeProject===p.id)activeProject='question';render();});remove.setAttribute('aria-label','删除项目 '+p.name);line.append(remove);
         }
         sidebar.append(line);
       }
       const addActions=el('div');addActions.className='project-add';addActions.append(button('+ 模型',()=>newProject('model')),button('+ 工作项',()=>newProject('work')));addActions.children[0].setAttribute('aria-label','新建模型');addActions.children[1].setAttribute('aria-label','新建工作项');sidebar.append(addActions);
       const left=el('div'),right=el('div');left.style.cssText=right.style.cssText='overflow:auto;min-height:0;background:var(--pet-canvas,#10171e);border:1px solid var(--pet-border,#303c48);border-radius:10px;padding:12px';
       left.className='mapping-current';right.className='mapping-headers';
-      left.append(el('h3','选中的表头'));right.append(el('h3','所有表头'));
-      const projectSummary=el('p',project.name);projectSummary.className='project-summary';left.append(projectSummary);
+      left.append(el('h3',slotMode?'字段映射':'选中的表头'));right.append(el('h3','所有表头'));
+      const projectSummary=el('p',project.name);projectSummary.className='project-summary';if(!slotMode)left.append(projectSummary);
+      if(project.type==='work') {
+        const entity=draft.entities.find(e=>e.id===project.id);
+        const typeBar=el('div');typeBar.className='mapping-work-type';
+        for(const [kind,label] of [['annotation','标注'],['quality','质检']]){const control=button(label,()=>{entity.workType=kind;if(kind!=='quality')delete entity.annotationWorkId;render();});control.setAttribute('aria-label',`工作项类型 ${label}`);control.setAttribute('aria-pressed',String(entity.workType===kind));control.classList.toggle('active',entity.workType===kind);typeBar.append(control);}
+        left.append(typeBar);
+      }
       const selectedList=el('div');selectedList.className='selected-list';left.append(selectedList);
       const search=el('input');search.placeholder='搜索表头';search.setAttribute('aria-label','搜索表头');search.value=searchText;right.append(search);
       const count=el('p'),headers=el('div');headers.className='mapping-header-list';headers.style.cssText='overflow:auto;min-height:0;flex:1;margin-top:8px';right.style.display='flex';right.style.flexDirection='column';right.style.overflow='hidden';right.append(count,headers);
       const chosen=new Map(project.fields.filter(f=>f.source).map(f=>[f.source.index,f.source]));
+      if(slotMode){
+        for(const role of slotRoles){
+          const field=slotFields.get(role),card=el('div');card.className='mapping-slot';card.dataset.role=role;
+          card.classList.toggle('is-active',activeSlot===role);
+          const label=el('span',role);label.className='slot-label';
+          const pick=button(field.source?`${M.letter(field.source.index)} · ${field.source.header}`:'',()=>{activeSlot=role;render();});
+          pick.setAttribute('aria-label',`选择槽位 ${role}`);pick.setAttribute('aria-pressed',String(activeSlot===role));pick.className='slot-source';
+          if(field.unresolvedSource)pick.title=`原关联已失效：${field.unresolvedSource.header}`;
+          const clear=button('×',()=>{field.source=null;delete field.unresolvedSource;activeSlot=role;render();});clear.className='slot-clear';clear.setAttribute('aria-label',`清空槽位 ${role}`);clear.title='解除关联';clear.hidden=!field.source;
+          card.append(label,pick,clear);label.onclick=()=>{activeSlot=role;render();};selectedList.append(card);
+        }
+      }else{
       for(const [index,source] of [...chosen].sort((a,b)=>a[0]-b[0])){
         const box=el('div');box.className='selected-header';box.style.cssText='display:flex;align-items:center;gap:6px;padding:4px 8px;margin:0 0 6px;border:1px solid var(--pet-border,#465564);border-radius:8px;background:var(--pet-raised,#202b36)';
         const label=button(`${M.letter(index)} · ${source.header}${project.fields.some(f=>f.id===draft.identityFieldId&&f.source?.index===index)?' · 唯一标识':''}`,()=>{searchText='';search.value='';renderHeaders();locate(index);});label.setAttribute('aria-label',`定位表头 ${M.letter(index)} · ${source.header}`);label.style.cssText='flex:1;overflow-wrap:anywhere;text-align:left;border:0;background:transparent';
-        const remove=button('×',()=>{if(project.single)setQuestionType(null);else project.fields.filter(f=>f.source?.index===index).forEach(f=>f.source=null);render();});remove.setAttribute('aria-label',`移除 ${M.letter(index)} · ${source.header}`);box.append(label,remove);selectedList.append(box);
+        const remove=button('×',()=>{project.fields.filter(f=>f.source?.index===index).forEach(f=>f.source=null);render();});remove.setAttribute('aria-label',`移除 ${M.letter(index)} · ${source.header}`);box.append(label,remove);selectedList.append(box);
       }
-      projectSummary.textContent=project.single?'题目类型 · 单选，用于匹配人评维度':`${project.name} · ${chosen.size} 个字段`;
-      if(!chosen.size)selectedList.append(el('p',project.single?'从右侧选择一个题目类型列。':'从右侧选择表头，加入当前项目。'));
+      }
+      projectSummary.textContent=slotMode?`${project.name} · 选择槽位，再选择右侧表头`:`${project.name} · ${chosen.size} 个字段`;
+      if(!slotMode&&!chosen.size)selectedList.append(el('p','从右侧选择表头，加入当前项目。'));
       for(const field of project.fields.filter(f=>f.unresolvedSource))selectedList.append(el('p',`待确认：${field.unresolvedSource.header} · ${field.mappingIssue}`));
 
 
       function renderHeaders(){
-        headers.replaceChildren();if(project.single)headers.setAttribute('role','radiogroup');else headers.removeAttribute('role');const linked=new Set(draft.fields.filter(f=>f.source).map(f=>f.source.index));count.textContent='● 已关联其他项目    ✓ 当前项目已选';
+        headers.replaceChildren();if(project.single)headers.setAttribute('role','radiogroup');else headers.removeAttribute('role');const linked=new Set(draft.fields.filter(f=>f.source).map(f=>f.source.index));count.textContent='';count.hidden=true;
         row.headers.forEach((header,index)=>{
           if(header==='标注结果')return;
           if(!`${M.letter(index)} ${header}`.toLowerCase().includes(searchText.toLowerCase()))return;
-          const current=project.fields.some(f=>f.source?.index===index);
+          const current=slotMode?slotFields.get(activeSlot)?.source?.index===index:project.fields.some(f=>f.source?.index===index);
           const targets=projectList.filter(p=>p.fields.some(f=>f.source?.index===index));
           const item=button('',()=>{
-            if(project.single){if(!current)setQuestionType(index);render();return;}
+            if(slotMode){
+              const field=slotFields.get(activeSlot);
+              const occupied=draft.fields.find(f=>f!==field&&f.source?.index===index);
+              if(occupied&&!(project.type==='work'&&['人员','日期','状态','备注'].includes(activeSlot)&&['人员','日期','状态','备注'].includes(occupied.role))){showNotice(`此表头已关联「${occupied.label}」，请先解除原关联。`);return;}
+              field.source=field.source?.index===index?null:M.source(row,index);field.manual=true;delete field.unresolvedSource;delete field.mappingIssue;showNotice('');render();return;
+            }
             if(current)project.fields.filter(f=>f.source?.index===index).forEach(f=>f.source=null);
             else {
               draft.entities ||= [];
               if(!draft.entities.some(e=>e.id===project.id))draft.entities.push({id:project.id,name:project.name,type:project.type});
-              const detected=M.describe(header),role=detected?.role||header||M.letter(index);
-              draft.fields.push({id:crypto.randomUUID(),entityId:project.id,role,manual:true,group:project.type==='fixed'?M.groups[0]:detected?.group||(project.type==='work'?M.groups[1]:M.groups[0]),label:project.type==='fixed'?header:`${project.name} · ${role}`,source:M.source(row,index)});
+              const detected=M.describe(header),role=project.id==='case-rubric'?'题目rubric':detected?.role||header||M.letter(index);
+              if(project.id==='case-rubric')project.fields.forEach(f=>f.source=null);
+              draft.fields.push({id:crypto.randomUUID(),entityId:project.id,role,manual:true,group:project.id==='case-rubric'?'评分标准':project.type==='fixed'?M.groups[0]:detected?.group||(project.type==='work'?M.groups[1]:M.groups[0]),label:project.type==='fixed'?header:`${project.name} · ${role}`,source:M.source(row,index)});
             }
             render();
           });
@@ -218,11 +250,17 @@
       footer.replaceChildren();const spacer=el('span');spacer.className='grow';
       const snapshot=JSON.stringify(draft);
       if(saveResult&&saveResult.snapshot!==snapshot)clearSaveResult();
-      const origin=el('span',savedSnapshot===null?(snapshot===initialSnapshot?'自动识别 · 待保存':'有未保存修改'):snapshot===savedSnapshot?'':'有未保存修改');origin.className='draft-origin';
-      footer.append(origin,spacer);
+      const draftState=savedSnapshot===null?(snapshot===initialSnapshot?'自动识别 · 待保存':'有未保存修改'):snapshot===savedSnapshot?'':'有未保存修改';
+      if(draftState!==lastDraftState){lastDraftState=draftState;if(!message.textContent)showNotice(draftState);}
+      footer.append(message,spacer);
       saveControl=button('',save);saveControl.className='primary mapping-save';saveControl.setAttribute('aria-live','polite');
       paintSaveControl();footer.append(autoButton,saveControl);
       root.querySelectorAll('button,input,select').forEach(control=>control.disabled=busy);
+    }
+    function clearNotice(){clearTimeout(noticeTimer);noticeTimer=null;message.textContent='';}
+    function showNotice(text){
+      clearNotice();message.textContent=text;
+      if(text)noticeTimer=setTimeout(()=>{message.textContent='';noticeTimer=null;},NOTICE_DURATION);
     }
     function paintSaveControl(){
       if(!saveControl)return;
@@ -234,11 +272,12 @@
     function showSaveResult(label,reason=''){
       clearTimeout(saveTimer);saveResult={label,reason,snapshot:JSON.stringify(draft)};
       saveTimer=null;
-      if(label==='已保存')saveTimer=setTimeout(()=>{saveResult=null;saveTimer=null;paintSaveControl();},3000);
+      showNotice(reason?`${label}：${reason}`:label);
+      saveTimer=setTimeout(()=>{saveResult=null;saveTimer=null;paintSaveControl();},NOTICE_DURATION);
     }
     async function save(){
       if(busy)return;
-      busy=true;saving=true;message.textContent='';clearSaveResult();render();
+      busy=true;saving=true;showNotice('');clearSaveResult();render();
       try{
         const current=await chrome.runtime.sendMessage({type:'READ_ACTIVE_ROW'});
         if(!current?.ok)throw new Error(current?.error||'请先刷新表格。');

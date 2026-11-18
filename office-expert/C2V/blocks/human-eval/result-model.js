@@ -47,7 +47,7 @@
     )
       fail("模型与当前映射不一致。");
     if (rubricId && data.rubric_id !== rubricId)
-      fail("rubric 与当前题目类型不一致。");
+      fail("rubric 与当前题目标准不一致。");
     const ids = new Set();
     const answers = data.criteria.map((c) => {
       if (typeof c.id !== "string" || !c.id || ids.has(c.id))

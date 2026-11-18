@@ -12,6 +12,9 @@
 
   const SVG_NS = 'http://www.w3.org/2000/svg';
   const ICONS = {
+    GripVertical: [
+      ...[5,12,19].flatMap(cy=>[9,15].map(cx=>['circle',{cx:String(cx),cy:String(cy),r:'1'}]))
+    ],
     Volume2: [
       ['path', { d: 'M11 5 6 9H3v6h3l5 4V5Z' }],
       ['path', { d: 'M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14' }]
@@ -192,6 +195,9 @@
       ['rect', { width: '18', height: '18', x: '3', y: '3', rx: '2' }],
       ['path', { d: 'M9 3v18' }],
       ['path', { d: 'm14 9 3 3-3 3' }]
+    ],
+    Check: [
+      ['path', { d: 'm20 6-11 11-5-5' }]
     ],
     CheckCircle2: [
       ['circle', { cx: '12', cy: '12', r: '10' }],

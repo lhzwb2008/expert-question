@@ -292,7 +292,9 @@
       });
       listen(viewport, 'keydown', event => {
         if (event.key !== ' ' && event.key !== 'Enter') return;
-        event.preventDefault(); event.stopPropagation(); run(toggle);
+        event.preventDefault(); event.stopPropagation();
+        if (event.repeat) return;
+        run(toggle);
       });
       listen(viewport, 'pointerdown', event => {
         moved = false;

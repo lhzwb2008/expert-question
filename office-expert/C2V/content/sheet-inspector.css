@@ -7320,3 +7320,10 @@
 #gtm-sheet-inspector-root.cyle-page-shell .is-public-materials-hidden>.cyle-public-materials>.cyle-public-list { overflow:visible;padding:0; }
 #gtm-sheet-inspector-root.cyle-page-shell .is-public-materials-hidden .cyle-public-card.is-floating { visibility:visible; }
 .cyle-public-toggle { flex:none;white-space:nowrap;margin-left:auto; }
+
+.cyle-public-card.has-model-video-title .cyle-public-card-header strong { white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+
+/* Only work pages and their tabs depend on selection; shared controls remain. */
+.gtm-inspector-panel.needs-work-selection :is(.cyle-tool-page-body,[data-recipe-id]) {display:none!important}
+
+.gtm-inspector-panel[data-work-type="quality"] [data-recipe-id="caption-review"]{display:none!important}

@@ -65,7 +65,7 @@
       );
       heading.lastElementChild.append(
         el('strong', '', '工作区装配器'),
-        el('span', '', '题库字段映射与人评评估维度，统一在此配置')
+        el('span', '', '配置题库字段映射')
       );
       const close = button('关闭', 'X', () => this.close(), 'is-icon');
       header.append(heading, close);
@@ -93,13 +93,9 @@
       this.mappingContent = el('div');
       this.mappingContent.style.height='100%';
       mappingPane.append(this.mappingNotice, this.mappingContent);
-      const rubricPane = el('div');
-      rubricPane.hidden=true;rubricPane.style.cssText='min-height:0;overflow:hidden';
-      const rubricTab = button('人评评估维度', 'FileText', () => this.showRubric());
       const mappingTab = button('题库映射', 'Settings', () => this.showMapping());
-      tabs.append(mappingTab, rubricTab);
-      dialog.append(header, tabs, mappingPane, rubricPane);
-      this.rubricPane=rubricPane;this.rubricTab=rubricTab;
+      mappingTab.classList.add('is-primary');tabs.append(mappingTab);
+      dialog.append(header,tabs,mappingPane);
       this.mappingPane=mappingPane;
       this.mappingTab=mappingTab;
       overlay.append(dialog);
@@ -113,24 +109,7 @@
       await this.showMapping();
     }
 
-    selectPane(name) {
-      for (const [key, pane, tab] of [
-        ['mapping', this.mappingPane, this.mappingTab],
-        ['rubric', this.rubricPane, this.rubricTab]
-      ]) {
-        pane.hidden = key !== name;
-        tab.classList.toggle('is-primary', key === name);
-      }
-    }
-
-    async showRubric() {
-      this.selectPane('rubric');
-      this.rubricEditor ||= globalThis.__cyleHumanRubricEditorV1.create(this.rubricPane);
-      await this.rubricEditor.open();
-    }
-
-    async showMapping({ select = true } = {}) {
-      if (select) this.selectPane('mapping');
+    async showMapping() {
       const row = this.getRow?.();
       const error = this.getReadError?.();
       this.mappingNotice.textContent = row ? '' : error
@@ -151,7 +130,7 @@
 
     setRow() {
       if (this.overlay.hidden) return;
-      this.showMapping({ select: false }).catch(error => this.onNotice?.(error.message, true));
+      this.showMapping().catch(error => this.onNotice?.(error.message, true));
     }
 
     close() {
@@ -161,7 +140,6 @@
 
     dispose() {
       this.mappingEditor?.dispose();
-      this.rubricEditor?.dispose();
       this.overlay.remove();
     }
   }

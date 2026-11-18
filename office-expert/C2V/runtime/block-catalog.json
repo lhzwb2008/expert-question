@@ -79,22 +79,28 @@
       "recipe:human-eval"
     ],
     "files": [
+      "services/question-rubric-service.js",
+      "services/case-eval-service.js",
       "blocks/machine-eval/timeline-model.js",
       "blocks/machine-eval/workbench.js",
       "blocks/human-eval/timeline.js",
       "blocks/human-eval/result-model.js",
       "blocks/human-eval/review-list.js",
-      "blocks/human-eval/workbench.js"
+      "blocks/human-eval/workbench.js",
+      "blocks/human-eval/case-workbench.js"
     ],
     "readyGlobals": [
+      "__cyleQuestionRubricV1",
       "__cyleEvaluationTimelineV1",
       "__cyleMachineEvaluationV1",
       "__cyleHumanTimelineV1",
       "__cyleHumanResultV1",
       "__cyleHumanReviewListV1",
-      "__cyleHumanEvaluationV1"
+      "__cyleHumanEvaluationV1",
+      "__cyleCaseEvalV1",
+      "__cyleCaseHumanEvaluationV1"
     ],
-    "factoryGlobal": "__cyleHumanEvaluationV1",
+    "factoryGlobal": "__cyleCaseHumanEvaluationV1",
     "isolation": {
       "mode": "shadow",
       "lifecycleTimeoutMs": 12000,
@@ -141,22 +147,28 @@
       "recipe:caption-review"
     ],
     "files": [
+      "services/question-rubric-service.js",
+      "services/case-eval-service.js",
       "blocks/machine-eval/timeline-model.js",
       "blocks/machine-eval/workbench.js",
       "blocks/human-eval/timeline.js",
       "blocks/human-eval/result-model.js",
       "blocks/human-eval/review-list.js",
       "blocks/human-eval/workbench.js",
+      "blocks/human-eval/case-workbench.js",
       "blocks/caption-review/compare.js"
     ],
     "readyGlobals": [
+      "__cyleQuestionRubricV1",
       "__cyleEvaluationTimelineV1",
       "__cyleMachineEvaluationV1",
       "__cyleHumanTimelineV1",
       "__cyleHumanResultV1",
       "__cyleHumanReviewListV1",
       "__cyleHumanEvaluationV1",
-      "__cyleModelCompareV1"
+      "__cyleModelCompareV1",
+      "__cyleCaseEvalV1",
+      "__cyleCaseHumanEvaluationV1"
     ],
     "factoryGlobal": "__cyleModelCompareV1",
     "isolation": {

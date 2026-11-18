@@ -340,10 +340,9 @@
         return;
       }
       if (!this.template) {
-        this.details.append(el("p", "选择评估模板后显示对应维度。", "empty"));
         return;
       }
-      if (!this.humanSources.length)
+      if (!this.humanSources.length && !this.caseMode)
         this.details.append(
           el("p", "当前模型未绑定人评列，请在“组装”中配置。", "warning"),
         );
@@ -364,8 +363,10 @@
               `${criterion.id} · ${criterion.title}`,
               "human-title",
             );
-          title.tabIndex = 0;
-          this.bindRubricTip(title, criterion.definition);
+          if (criterion.definition?.trim() && criterion.definition.trim() !== criterion.title.trim()) {
+            title.tabIndex = 0;
+            this.bindRubricTip(title, criterion.definition);
+          }
           heading.append(title);
           const options = criterion.score_values.map((score) => ({
             label: `${score} 分`,
@@ -470,7 +471,7 @@
       }
       if (!this.groups.length)
         this.details.append(
-          el("p", "此模板没有启用的评估维度，请在组装中编辑。", "empty"),
+          el("p", "本题 rubric 没有可用检查点。", "empty"),
         );
       this.renderHistory();
       this.renderRaw();

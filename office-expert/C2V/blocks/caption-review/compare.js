@@ -84,44 +84,55 @@
       const style = el("style");
       style.textContent = `
         :host{display:block;height:100%;color:var(--pet-text);font:13px/1.5 Inter,"PingFang SC",sans-serif}*{box-sizing:border-box}[hidden]{display:none!important}
-        .comparison{height:100%;display:flex;flex-direction:column;min-height:0}.model-tabs{display:flex;gap:6px;padding:8px 10px;overflow-x:auto;flex-shrink:0;border-bottom:1px solid var(--pet-border)}
+        .comparison{height:100%;display:flex;flex-direction:column;min-height:0}.model-tabs{background:var(--pet-canvas);display:flex;gap:6px;padding:8px 10px;overflow-x:auto;flex-shrink:0;border-bottom:1px solid var(--pet-border)}
         button{font:inherit;cursor:pointer;color:var(--pet-text);background:var(--pet-raised);border:1px solid var(--pet-border);border-radius:5px;padding:5px 8px}button:disabled{opacity:.45;cursor:default}button:focus-visible{outline:2px solid var(--pet-accent);outline-offset:2px}
-        .model-tabs button{position:relative;white-space:nowrap;font-size:12px;border-radius:8px;padding:8px 13px;border:1px solid var(--pet-border);background:var(--pet-raised);color:var(--pet-muted);transition:background .15s,border-color .15s,box-shadow .15s}
+        .model-tabs button{position:relative;white-space:nowrap;font-size:12px;border-radius:8px;padding:8px 13px;border:1px solid var(--pet-border);background:color-mix(in srgb,var(--model-color) 10%,var(--pet-surface));color:var(--pet-muted);transition:background .15s,border-color .15s,box-shadow .15s}
         .model-tabs button::after{content:"";position:absolute;inset:3px;border:1px dashed color-mix(in srgb,var(--model-color) 40%,var(--pet-border));border-radius:5px;pointer-events:none}
         .model-tabs button:hover:not(:disabled){background:color-mix(in srgb,var(--model-color) 12%,var(--pet-raised));border-color:var(--model-color);color:var(--pet-text)}
         .model-tabs button[aria-pressed=true]{background:color-mix(in srgb,var(--model-color) 23%,var(--pet-raised));border-color:var(--model-color);color:var(--pet-text);font-weight:650;box-shadow:none}
         .model-tabs button[aria-pressed=true]::after{border-color:color-mix(in srgb,var(--model-color) 75%,var(--pet-text))}
         .model-tabs button.is-current{background:color-mix(in srgb,var(--model-color) 36%,var(--pet-raised));box-shadow:0 0 0 1px var(--model-color)}
 
+        .shared-timeline{flex:none;overflow-x:scroll;overflow-y:hidden;scrollbar-width:thin;scrollbar-color:var(--pet-border) var(--pet-canvas);background:var(--pet-canvas);position:relative;border-bottom:1px solid var(--pet-border)}
+        .shared-timeline::-webkit-scrollbar{height:6px}.shared-timeline::-webkit-scrollbar-track{background:var(--pet-canvas)}.shared-timeline::-webkit-scrollbar-thumb{background:var(--pet-border);border-radius:3px}
+        .shared-plot{position:relative;height:62px}.shared-tick{position:absolute;top:3px;font-size:11px;color:var(--pet-muted);font-variant-numeric:tabular-nums;transform:translateX(-50%)}
+        .shared-tick::after{content:"";position:absolute;top:21px;left:50%;height:4px;border-left:1px solid var(--pet-muted)}
+        .shared-tick.is-start{transform:none}.shared-tick.is-start::after{left:0}.shared-tick.is-end{transform:translateX(-100%)}.shared-tick.is-end::after{left:100%}
+        .shared-rule{position:absolute;left:0;right:0;border-top:1px solid var(--pet-border)}
         .shared-timeline button[aria-pressed=true]{outline:0;background:transparent;text-decoration:underline;text-underline-offset:3px}.shared-timeline button:focus:not(:focus-visible){outline:0}.evidence-choices{flex:none;border-bottom:1px solid var(--pet-border);max-height:70px;overflow:auto}.evidence-choices button{font-size:11px;padding:3px 6px}
-        .comparison-columns{display:grid;flex:1;min-height:0;min-width:0;overflow:auto;overflow-anchor:none;align-items:start;gap:0}.model-column{display:flex;flex-direction:column;min-width:0;min-height:0;border-right:1px solid var(--pet-border)}.model-column:last-child{border-right:0}
-        .model-editor{min-height:0;min-width:0;overflow:visible;container-type:inline-size;container-name:model-editor}.comparison-message{font-size:12px;padding:12px;color:var(--pet-muted)}
+        .comparison-message{font-size:12px;padding:12px;color:var(--pet-muted)}
       `;
+      style.textContent += `.model-tabs button[draggable=true]{cursor:grab}.model-tabs button.is-rank-dragging{opacity:.45}.model-tabs button[data-drop-side=before]{box-shadow:inset 3px 0 var(--pet-accent)}.model-tabs button[data-drop-side=after]{box-shadow:inset -3px 0 var(--pet-accent)}.model-tabs button[data-drop-side=tie]{outline:2px dashed var(--pet-accent);outline-offset:-4px}.model-rank-badge{margin-left:7px;font-size:10px;font-weight:400;color:var(--pet-muted)}`;
+      style.textContent += globalThis.__cyleHumanEvaluationV1.caseStyles || "";
       this.body = el("section", "", "comparison");
+      this.caseToolbar=el("div","","case-toolbar-host");
       this.tabs = el("nav", "", "model-tabs");
       this.tabs.setAttribute("aria-label", "比对模型");
-      this.grid = el("div", "", "comparison-columns");
+      const surface=globalThis.__cyleCaseHumanEvaluationV1.createComparisonSurface();
+      this.grid=surface.grid;
       this.message = el("p", "", "comparison-message");
       this.message.hidden = true;
       this.timeline = el("div", "", "shared-timeline");
       this.timeline.tabIndex = 0;
       this.timeline.addEventListener("click", event => event.stopPropagation());
-      this.timeline.style.cssText = "flex:none;overflow-x:auto;background:var(--pet-canvas);position:relative";
+      this.timeline.setAttribute("aria-label", "多模型时间轴");
+      this.timeline.title = "Ctrl / ⌘ + 滚轮缩放；Ctrl / ⌘ + 0 恢复全长";
       this.choices = el("div", "", "evidence-choices");
       this.choices.hidden = true;
-      this.body.append(this.tabs, this.timeline, this.choices, this.message, this.grid);
+      this.caseDirectory=surface.directory;this.caseReviewArea=surface.area;this.grid.addEventListener('scroll',()=>this.caseEditor?.updateDirectoryPosition(this.caseDirectory));
+      this.body.append(this.tabs,this.timeline,this.choices,this.message,this.caseReviewArea,this.caseToolbar);
       this.zoom = 1;
       this.timeline.addEventListener("wheel", event => {
         if (!event.ctrlKey && !event.metaKey) return;
         event.preventDefault();
-        this.zoom = Math.max(1, Math.min(16, this.zoom * Math.exp(-event.deltaY * .008)));
-        this.renderSharedTimeline();
+        const rect = this.timeline.getBoundingClientRect();
+        const scale = rect.width / this.timeline.offsetWidth || 1;
+        this.setTimelineZoom(this.zoom * Math.exp(-event.deltaY * .008), (event.clientX - rect.left) / scale);
       }, {passive:false});
       this.timeline.addEventListener("keydown", event => {
         if (!(event.ctrlKey || event.metaKey) || !["+","=","-","0"].includes(event.key)) return;
         event.preventDefault();
-        this.zoom = event.key === "0" ? 1 : Math.max(1, Math.min(16, this.zoom * (event.key === "-" ? .8 : 1.25)));
-        this.renderSharedTimeline();
+        this.setTimelineZoom(event.key === "0" ? 1 : this.zoom * (event.key === "-" ? .8 : 1.25));
       });
       this.resizeObserver = new ResizeObserver(() => this.scheduleLayout());
       this.resizeObserver.observe(this.grid);
@@ -260,9 +271,33 @@
           : this.selected.has(model.id)
             ? "点击关闭此列"
             : "点击打开此列";
-        tab.addEventListener("click", () => this.toggleModel(model));
+        tab.setAttribute('aria-label',model.name);
+        const badge=el('span','','model-rank-badge');badge.setAttribute('aria-hidden','true');tab.append(badge);
+        tab.addEventListener("click", () => {if(Date.now()<(this.rankClickUntil||0))return;this.toggleModel(model);});
+        tab.ondragstart=e=>{
+          if(!this.caseEditor?.caseWritable){e.preventDefault();return;}
+          this.rankDrag={name:model.name,session:this.caseEditor.caseSession};e.dataTransfer.setData('text/plain',model.name);e.dataTransfer.effectAllowed='move';tab.classList.add('is-rank-dragging');
+        };
+        tab.ondragover=e=>{
+          if(!this.rankDrag||this.rankDrag.name===model.name||!this.caseEditor?.caseWritable)return;
+          e.preventDefault();e.dataTransfer.dropEffect='move';const box=tab.getBoundingClientRect(),x=(e.clientX-box.left)/box.width;
+          tab.dataset.dropSide=x<.3?'before':x>.7?'after':'tie';
+        };
+        tab.ondragleave=()=>delete tab.dataset.dropSide;
+        tab.ondrop=e=>{
+          e.preventDefault();const drag=this.rankDrag,side=tab.dataset.dropSide;this.endRankDrag();
+          if(drag&&side&&drag.session===this.caseEditor?.caseSession)this.rankRelative(drag.name,model.name,side);
+        };
+        tab.ondragend=()=>this.endRankDrag();
+        tab.onkeydown=e=>{
+          if(!e.altKey||!['ArrowLeft','ArrowRight','Backspace'].includes(e.key)||!this.caseEditor?.caseWritable)return;
+          e.preventDefault();if(e.key==='Backspace'){this.caseEditor.setModelRank(model.name,null);return;}
+          const ordered=this.orderedModels(),i=ordered.findIndex(m=>m.id===model.id),target=ordered[i+(e.key==='ArrowLeft'?-1:1)];
+          if(target)this.rankRelative(model.name,target.name,e.key==='ArrowLeft'?'before':'after');
+        };
         this.tabs.append(tab);
       }
+      this.refreshRankControls();
     }
     toggleModel(model) {
       if (!model.columns.length) return;
@@ -272,7 +307,7 @@
       this.renderColumns();
     }
     async renderColumns(refresh = false) {
-      const selected = this.models.filter((m) => this.selected.has(m.id));
+      const selected = this.orderedModels().filter((m) => this.selected.has(m.id));
       for (const [id, record] of this.columns) {
         if (!this.selected.has(id)) {
           record.editor.dispose();
@@ -286,15 +321,8 @@
         let record = this.columns.get(model.id),
           created = false;
         if (!record) {
-          const node = el("section", "", "model-column");
-          node.dataset.compareModel = model.id;
-          node.dataset.modelName = model.name;
-          const host = el("div", "", "model-editor"),
-            shadow = host.attachShadow({ mode: "open" }),
-            root = el("div");
-          root.style.height = "auto";
-          shadow.append(root);
-          node.append(host);
+          const {node,host,root}=globalThis.__cyleCaseHumanEvaluationV1.createComparisonColumn();
+          node.dataset.compareModel=model.id;node.dataset.modelName=model.name;
           const editor = new ModelColumn({ ...this.context, root }, model);
           editor.compareHost = this;
           editor.setActive(false);
@@ -333,7 +361,48 @@
           : "请先在组装中关联模型回答列。";
       this.highlightFocus();
       await Promise.all(updates);
+      const first=selected.length?this.columns.get(selected[0].id)?.editor:null;
+      if(first?.caseControls)this.setCaseControls(first);else {this.caseToolbar.replaceChildren();this.caseDirectory.replaceChildren();this.caseRanking?.remove();this.caseEditor=null;document.dispatchEvent(new Event('cyle:case-save-status'));}
       this.scheduleLayout();
+    }
+    getWritebackEditor(){return this.caseEditor;}
+    setCaseControls(editor){this.caseEditor=editor;this.caseToolbar.replaceChildren(editor.caseControls);this.updateCaseNavigation(editor);document.dispatchEvent(new Event('cyle:case-save-status'));}
+    updateCaseNavigation(editor){
+      if(this.caseEditor!==editor)return;
+      editor.renderDirectory(this.caseDirectory,(id,criterionId)=>editor.navigateDimension(id,criterionId));
+      this.caseRanking ||= el('section');editor.renderRanking(this.caseRanking);this.grid.append(this.caseRanking);this.refreshRankControls();
+    }
+    orderedModels(){
+      const groups=this.caseEditor?.caseSession?.data.ranking||[],names=groups.flat();
+      const rank=name=>{const i=names.indexOf(name);return i<0?Infinity:i;};
+      return [...this.models].sort((a,b)=>rank(a.name)-rank(b.name));
+    }
+    endRankDrag(){
+      this.rankDrag=null;this.rankClickUntil=Date.now()+200;
+      for(const tab of this.tabs.querySelectorAll('button')){delete tab.dataset.dropSide;tab.classList.remove('is-rank-dragging');}
+    }
+    rankRelative(name,target,side){
+      const editor=this.caseEditor;if(!editor?.caseWritable||name===target)return;
+      editor.rankModelRelative(name,target,side);
+      this.updateCaseNavigation(editor);this.renderColumns();
+    }
+    refreshRankControls(){
+      if(!this.tabs)return;const editor=this.caseEditor,groups=editor?.caseSession?.data.ranking||[];
+      for(const model of this.orderedModels()){
+        const tab=[...this.tabs.children].find(n=>n.dataset.modelId===model.id);if(!tab)continue;
+        const index=groups.findIndex(g=>(Array.isArray(g)?g:[g]).includes(model.name));
+        const badge=tab.querySelector('.model-rank-badge');if(badge)badge.textContent=index<0?'':`${index+1}${groups[index].length>1?' 并列':''}`;
+        tab.draggable=!!editor?.caseWritable&&!tab.disabled;
+        tab.title=tab.disabled?'请在组装中关联此模型的回答列':`${this.selected.has(model.id)?'点击关闭此列':'点击打开此列'}；拖到按钮左右调整排名，拖到中间并列。Alt + 左右键调序，Alt + 退格取消排名。`;
+        this.tabs.append(tab);
+      }
+      // Reorder mounted columns without recreating editors or their media.
+      let position=0;
+      for(const model of this.orderedModels()){
+        const node=this.columns.get(model.id)?.node;if(!node)continue;
+        if(this.grid.children[position]!==node)this.grid.insertBefore(node,this.grid.children[position]||null);
+        position++;
+      }
     }
     modelColor(id) {
       const colors = ["#b09acb", "#67acb0", "#c6a06b", "#c68fa5", "#8aa5cb", "#9eae77"];
@@ -377,25 +446,49 @@
       }));
       for (const {nodes, height} of sizes)
         for (const node of nodes) node.style.minHeight = `${height}px`;
+      globalThis.__cyleCaseHumanEvaluationV1.alignDimensionColumns([...this.columns.values()].map(r=>r.editor.details),this.grid);
       this.grid.scrollTop = scrollTop;
     }
+    setTimelineZoom(value, anchor = this.timeline.clientWidth / 2) {
+      const next = Math.max(1, Math.min(16, value));
+      if (next === this.zoom) return;
+      const oldWidth = this.timeline.firstElementChild?.offsetWidth || this.timeline.clientWidth;
+      const fraction = Math.max(0, Math.min(1, (this.timeline.scrollLeft + anchor - 12) / Math.max(1, oldWidth - 24)));
+      this.zoom = next;
+      this.renderSharedTimeline();
+      const width = this.timeline.firstElementChild?.offsetWidth || this.timeline.clientWidth;
+      this.timeline.scrollLeft = next === 1 ? 0 : 12 + fraction * (width - 24) - anchor;
+    }
     renderSharedTimeline() {
+      const scrollLeft = this.timeline.scrollLeft;
       this.timeline.replaceChildren();
       const records = this.models.map(model => this.columns.get(model.id)).filter(Boolean);
       if (!records.length) return;
       const extent = Math.max(1, ...records.map(({editor}) => editor.extent || 0));
       const width = Math.max(300, this.timeline.clientWidth) * this.zoom;
-      const plot = el("div");
-      plot.style.cssText = `position:relative;width:${width}px;height:${76+records.length*18}px`;
+      const plot = el("div", "", "shared-plot");
+      plot.style.width = `${width}px`;
       const x = time => 12 + Math.min(1, time / extent) * (width - 24);
-      for (let i=0;i<=5;i++) {
-        const tick = el("span", `${Math.round(extent*i/5)}s`);
-        tick.style.cssText = `position:absolute;left:${x(extent*i/5)}px;top:3px;font-size:11px;transform:translateX(${i===0?0:i===5?-100:-50}%)`;
+      // Match the human/machine ruler: keep readable tick spacing as the plot grows.
+      const desired = extent / Math.max(1, (width - 24) / 100);
+      const step = [.1,.2,.5,1,2,5,10,15,20,30,60,120,300,600,1800].find(n => n >= desired) || Math.ceil(desired / 60) * 60;
+      const ticks = [];
+      for (let i = 0; i <= Math.floor(extent / step); i++) ticks.push(i * step);
+      if (extent - ticks[ticks.length - 1] > 1e-6) {
+        if (ticks.length > 1 && x(extent) - x(ticks[ticks.length - 1]) < 55) ticks.pop();
+        ticks.push(extent);
+      }
+      for (const time of ticks) {
+        const tick = el("span", `${Number(time.toFixed(2))}s`, "shared-tick");
+        tick.dataset.time = String(time);
+        tick.classList.toggle("is-start", time === 0);
+        tick.classList.toggle("is-end", Math.abs(time - extent) < 1e-6);
+        tick.style.left = `${x(time)}px`;
         plot.append(tick);
       }
       for (const top of [28,60]) {
-        const line = el("div");
-        line.style.cssText = `position:absolute;top:${top}px;left:0;right:0;border-top:1px solid var(--pet-border)`;
+        const line = el("div", "", "shared-rule");
+        line.style.top = `${top}px`;
         plot.append(line);
       }
       const occupied = [], numbers = [], marks = new Map();
@@ -456,7 +549,7 @@
           plot.append(mark);
         });
       }
-      plot.style.height = `${72+Math.max(1,occupied.length)*20}px`;
+      plot.style.height = `${numbers.length ? 66 + occupied.length * 20 : 62}px`;
       const cursor = el("div", "", "shared-cursor");
       cursor.style.cssText = "position:absolute;top:23px;height:37px;width:14px;transform:translateX(-50%);pointer-events:none;z-index:2";
       const stem = el("div"), tip = el("div");
@@ -495,7 +588,7 @@
         if (editor.pendingEvidence) editor.placeEvidence(Math.min(start,end),Math.max(start,end));
       });
       plot.addEventListener("pointercancel", () => { gesture = null; });
-      this.timeline.append(plot);
+      this.timeline.scrollLeft = scrollLeft;
     }
     syncEvidenceSelection(editor, item) {
       this.selectedTime = `${editor.model.id}:${item.evidence.start}`;
@@ -636,6 +729,7 @@
       this.choices.hidden = true;
       this.selectedTime = null;
       this.columns.clear();
+      this.caseToolbar.replaceChildren();this.caseDirectory.replaceChildren();this.caseRanking?.remove();this.caseEditor=null;
       this.grid.replaceChildren();
     }
     dispose() {

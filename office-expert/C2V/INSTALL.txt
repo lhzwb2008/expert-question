@@ -1,4 +1,4 @@
-C2V 1.0.11 安装说明
+C2V 1.0.14 安装说明
 
 1. 完整解压 ZIP，把 C2V 文件夹放到一个长期保留的位置。
 2. Chrome 打开 chrome://extensions；Edge 打开 edge://extensions。

@@ -320,7 +320,7 @@
   }
 
   async function updateStorageStatus() {
-    if (!state.taskStorageLabel) return;
+    if (!state.taskStorageLabel || !state.open || state.root?.classList.contains('cyle-page-shell') || state.taskPanel?.hidden) return;
     const drafts = globalThis.__cyleDraftServiceV1;
     if (!drafts?.listDrafts || !drafts?.getCapacityStats) {
       state.taskStorageLabel.textContent = '存储服务不可用';
@@ -412,6 +412,65 @@
     setTimeout(() => URL.revokeObjectURL(url), 10000);
   }
 
+  async function finishCaseRecovery(session){
+    if(state.row?.tableKey===session.row.tableKey&&state.row?.rowIndex===session.row.rowIndex)await refreshRow();
+    if(state.draftCenter?.dialog.open)await reloadDraftCenter();
+  }
+
+  async function handleCaseRecovery(entry){
+    let C=globalThis.__cyleCaseEvalV1;const center=state.draftCenter;
+    try{
+      if(!C){await globalThis.__annotationHarnessV1.activateBlock('human-eval','recovery');C=globalThis.__cyleCaseEvalV1;}
+      const session=await C.resumeRecovery(entry),fresh=session.recoveryRow;delete session.recoveryRow;
+      const result=await C.inspectLatest(session,async()=>fresh);
+      if(result.state==='saved'){await C.confirmSaved(session,result.latest);await finishCaseRecovery(session);center.message.textContent='飞书已保存这份内容，备份已清理。';}
+      else if(result.state==='conflict'){void C.persist(session,'conflict').catch(()=>{});showCaseConflict(session,true);}
+      else {try{await C.save(session,writeGtCell);}catch(error){if(!session.pendingConflict)throw error;}
+        if(session.pendingConflict)showCaseConflict(session,true);else{await finishCaseRecovery(session);center.message.textContent='已保存到飞书。';}}
+    }catch(error){center.message.textContent=error.message;}
+  }
+
+  function showCaseConflict(session,fromCenter=false){
+    const C=globalThis.__cyleCaseEvalV1;
+    if(!session.pendingConflict)return;
+    state.caseConflictDialog?.close();state.caseConflictDialog?.remove();
+    const dialog=element('dialog','cyle-case-conflict');dialog.setAttribute('aria-label','选择写回内容');
+    state.caseConflictDialog=dialog;
+    const heading=element('h2','','飞书内容已变化');
+    const context=element('p','cyle-conflict-context',`${session.data.case_id} · ${session.ctx.work.name||''} · ${session.ctx.target.source.header}`);
+    const message=element('p','cyle-conflict-message');message.setAttribute('role','status');
+    const toggleLabel=element('label','cyle-conflict-toggle'),toggle=element('input');toggle.type='checkbox';toggleLabel.append(toggle,document.createTextNode('显示完整内容'));
+    const columns=element('div','cyle-conflict-columns');columns.append(element('strong','','飞书当前内容'),element('strong','','本次准备保存'));
+    const body=element('div','cyle-conflict-diff');
+    const format=value=>value===undefined?'（无）':value===null?'未评':typeof value==='boolean'?(value?'符合':'不符合'):typeof value==='object'?JSON.stringify(value,null,2):({unscored:'未评',scored:'已评',needs_review:'待复核'}[value]||String(value));
+    const render=()=>{
+      body.replaceChildren();
+      for(const entry of C.conflictDiff(session,toggle.checked)){
+        const row=element('section','cyle-conflict-row');row.dataset.changed=String(entry.changed);
+        row.append(element('h3','',entry.label));
+        const pair=element('div','cyle-conflict-pair');pair.append(element('pre','cyle-conflict-before',format(entry.before)),element('pre','cyle-conflict-after',format(entry.after)));row.append(pair);body.append(row);
+      }
+      if(!body.children.length)body.append(element('p','','评估内容没有差异。'));
+    };
+    const actions=element('div','cyle-conflict-actions');let busy=false;
+    const controls=[];
+    const choose=async choice=>{
+      if(busy)return;busy=true;controls.forEach(b=>b.disabled=true);message.textContent='';
+      try{
+        const result=await C.resolveConflict(session,choice,writeGtCell);
+        if(result.state==='conflict'){message.textContent='飞书又有更新，已刷新差异，请重新选择。';render();}
+        else {dialog.close();if(choice==='table'||fromCenter)await finishCaseRecovery(session);else updateCaseWriteButton();}
+      }catch(error){message.textContent=session.writeError||error.message;if(session.pendingConflict)render();if(state.draftCenter?.dialog.open)void reloadDraftCenter();}
+      finally{busy=false;controls.forEach(b=>b.disabled=false);}
+    };
+    for(const [label,choice] of [['采用飞书内容','table'],['保存我的版本','mine'],['暂不处理','cancel']]){
+      const b=element('button','',label);b.type='button';b.onclick=()=>choice==='cancel'?dialog.close():choose(choice);controls.push(b);actions.append(b);
+    }
+    toggle.onchange=render;dialog.addEventListener('cancel',e=>{if(busy)e.preventDefault();});
+    dialog.append(heading,context,message,toggleLabel,columns,body,actions);render();
+    (document.fullscreenElement||state.root).append(dialog);dialog.showModal();
+  }
+
   function renderDraftCenter() {
     const center = state.draftCenter;if (!center) return;
     const openIds = new Set([...center.list.querySelectorAll('details[open]')].map(n => n.dataset.draftId));
@@ -419,7 +478,8 @@
     center.filtered = center.entries.filter(entry => {
       if (center.scope.value === 'current' && entry.target.tableKey !== currentTableKey()) return false;
       if (center.kind.value && entry.kind !== center.kind.value) return false;
-      if (center.status.value && entry.status !== center.status.value) return false;
+      if (center.status.value === 'recovery' && !['回写失败','回写未确认','内容冲突'].includes(entry.status)) return false;
+      if (center.status.value && center.status.value !== 'recovery' && entry.status !== center.status.value) return false;
       return !query || [entry.target.workbookName, entry.target.sheetName, entry.target.tableKey, entry.target.header, entry.target.rowIndex + 1, entry.kind, entry.status].join(' ').toLowerCase().includes(query);
     });
     center.list.replaceChildren();center.count.textContent = `${center.filtered.length} 条 / 共 ${center.entries.length} 条`;
@@ -431,29 +491,49 @@
       card.append(heading, element('div', 'gtm-draft-context', [target.workbookName, target.sheetName || target.tableKey || '旧草稿', target.header || (target.columnIndex >= 0 ? `第 ${target.columnIndex + 1} 列` : '')].filter(Boolean).join(' / ')));
       const when = new Date(entry.updatedAt);card.append(element('div', 'gtm-draft-context', `保存时间：${Number.isNaN(when.getTime()) ? '未知' : when.toLocaleString()}`));
       const actions = element('div', 'gtm-draft-actions');
-      const navigate = element('button', '', sameDraftDocument(target) ? '返回对应行' : '打开表格并定位');navigate.type = 'button';
-      navigate.disabled = entry.expired || !Number.isInteger(target.rowIndex);
-      navigate.addEventListener('click', async () => { navigate.disabled = true;try { await returnToDraft(entry); } catch (error) { center.message.textContent = error.message; } finally { navigate.disabled = entry.expired; } });
-      const download = element('button', '', '导出这条');download.type = 'button';download.addEventListener('click', () => exportDraftEntries([entry]));actions.append(navigate, download);card.append(actions);
+      const navigate = element('button', '', '打开飞书表格');navigate.type='button';
+      const tableUrl=draftDocumentUrl(target);navigate.disabled=!tableUrl;
+      navigate.addEventListener('click',()=>{if(tableUrl)window.open(tableUrl,'_blank','noopener');});
+      const download = element('button', '', '导出这条');download.type = 'button';download.addEventListener('click', () => exportDraftEntries([entry]));actions.append(navigate, download);
+      if(entry.namespace==='case-eval-recovery'&&entry.value.recoveryVersion===2&&!entry.expired&&entry.value.recoveryStatus!=='resolved'){
+        const retry=element('button','',entry.status==='内容冲突'?'查看差异并选择':'检查并重试');retry.type='button';retry.onclick=async()=>{retry.disabled=true;try{await handleCaseRecovery(entry);}finally{retry.disabled=false;}};actions.prepend(retry);
+      }
+      card.append(actions);
       const preview = element('details', 'gtm-draft-preview');preview.dataset.draftId = entry.id;preview.open = openIds.has(entry.id);
-      preview.append(element('summary', '', '预览原值与草稿'));
+      preview.append(element('summary', '', '查看备份原文'));
+      const fillPreview=()=>{
+        if(preview.dataset.rendered)return;preview.dataset.rendered='true';
       for (const change of entry.changes) {
         const section = element('section');section.append(element('strong', '', change.header || `第 ${Number(change.columnIndex) + 1} 列`));
         const diff = element('div', 'gtm-draft-diff');
-        for (const [label, text] of [['保存时原值', change.before], [change.representation, change.after]]) { const side = element('div');side.append(element('span', '', label), element('pre', '', text || '（空）'));diff.append(side); }
+        for (const [label, text] of [['当时读到的内容（非实时）', change.before], [change.representation, change.after]]) { const side = element('div');side.append(element('span', '', label), element('pre', '', text || '（空）'));diff.append(side); }
         section.append(diff);preview.append(section);
       }
       if (Object.keys(entry.value.pendingReasons || {}).length) preview.append(element('strong', '', '尚未判定的理由'), element('pre', '', JSON.stringify(entry.value.pendingReasons, null, 2)));
-      if (!entry.changes.length && !Object.keys(entry.value.pendingReasons || {}).length) preview.append(element('p', '', '此快照没有待写回内容。'));
+      if (!entry.changes.length && !Object.keys(entry.value.pendingReasons || {}).length) preview.append(element('p', '', '此记录没有备份内容。'));
+      };
+      preview.addEventListener('toggle',()=>{if(preview.open)fillPreview();});
+      if(preview.open)fillPreview();
       card.append(preview);center.list.append(card);
     }
-    if (!center.filtered.length) center.list.append(element('p', '', '没有匹配的草稿。'));
+    if (!center.filtered.length) center.list.append(element('p', '', '没有待处理的回写备份。历史记录可切换筛选查看。'));
   }
 
   async function reloadDraftCenter() {
-    const center = state.draftCenter;if (!center) return;
-    try { center.entries = await globalThis.__cyleDraftServiceV1.listUnifiedDrafts();renderDraftCenter();center.message.textContent = '草稿保存在当前浏览器；导出文件可在下载记录中找到。返回编辑器后检查源数据冲突，预览不代表已写回。';updateStorageStatus(); }
-    catch (error) { center.message.textContent = `读取草稿失败：${error.message}`; }
+    const center=state.draftCenter;if(!center?.dialog.open||center.maintaining)return;
+    if(center.loading){center.reloadQueued=true;return center.loading;}
+    center.loading=(async()=>{
+      try{
+        const entries=await globalThis.__cyleDraftServiceV1.listUnifiedDrafts();
+        if(!center.dialog.open)return;
+        center.entries=entries;renderDraftCenter();
+        center.message.textContent='仅保留写回失败或未确认的内容；成功后清理。冲突可查看差异并选择，备份不自动恢复。历史工具记录仍可筛选查看。';
+      }catch(error){if(center.dialog.open)center.message.textContent=`读取草稿失败：${error.message}`;}
+    })();
+    try{await center.loading;}finally{
+      center.loading=null;
+      if(center.reloadQueued){center.reloadQueued=false;if(center.dialog.open)setTimeout(()=>reloadDraftCenter(),0);}
+    }
   }
 
   async function openDraftCenter() {
@@ -464,18 +544,24 @@
       const controls = element('div', 'gtm-draft-filters'), search = element('input');search.type = 'search';search.placeholder = '搜索表格、列名或行号';search.setAttribute('aria-label', '搜索草稿');
       const select = (label, options) => { const node = element('select');node.setAttribute('aria-label', label);options.forEach(([value, text]) => node.add(new Option(text, value)));node.addEventListener('change', renderDraftCenter);return node; };
       const scope = select('草稿范围', [['all','全部表格'],['current','当前工作表']]);
-      const kind = select('草稿类型', [['','全部类型'],['GT','GT'],['人评','人评'],['评审','评审'],['Chains','Chains'],['粗粒度','粗粒度']]);
-      const status = select('草稿状态', [['','全部状态'],['待写回','待写回'],['本地草稿','本地草稿'],['冲突副本','冲突副本'],['旧草稿待核对','旧草稿待核对'],['未修改快照','未修改快照'],['已过期','已过期']]);
+      const kind = select('草稿类型', [['','全部类型'],['整题','整题'],['GT','GT'],['人评','人评'],['评审','评审'],['Chains','Chains'],['粗粒度','粗粒度']]);
+      const status = select('草稿状态', [['recovery','待处理回写备份'],['','全部历史记录'],['回写失败','回写失败'],['回写未确认','回写未确认'],['内容冲突','内容冲突']]);
       search.addEventListener('input', renderDraftCenter);controls.append(search, scope, kind, status);
-      const toolbar = element('div', 'gtm-draft-actions'), count = element('span'), refresh = element('button', '', '刷新草稿'), exportButton = element('button', '', '导出当前筛选');
+      const toolbar = element('div', 'gtm-draft-actions'), count = element('span'), refresh = element('button', '', '刷新备份'), exportButton = element('button', '', '导出当前筛选');
       refresh.type = exportButton.type = 'button';refresh.addEventListener('click', reloadDraftCenter);exportButton.addEventListener('click', () => exportDraftEntries(state.draftCenter.filtered));toolbar.append(count, refresh, exportButton);
       const message = element('p', 'gtm-draft-message');message.setAttribute('role', 'status');const list = element('div', 'gtm-draft-list');
       dialog.append(title, controls, toolbar, message, list);state.draftCenter = { dialog, search, scope, kind, status, list, message, count, exportButton, entries: [], filtered: [] };
     }
     const center = state.draftCenter;(document.fullscreenElement || state.root).append(center.dialog);
-    if (!center.dialog.open) center.dialog.showModal();center.message.textContent = '正在保存当前修改并读取草稿…';
-    try { await flushWorkbenchDrafts();await reloadDraftCenter(); } catch (error) { center.message.textContent = error.message; }
-    center.search.focus();
+    if (!center.dialog.open) center.dialog.showModal();center.message.textContent = '正在读取回写备份…';
+    try {
+      if(!center.maintenance){
+        center.maintaining=true;
+        center.maintenance=globalThis.__cyleDraftServiceV1.cleanupExpired({namespace:null}).catch(()=>{}).finally(()=>{center.maintaining=false;});
+      }
+      await center.maintenance;await reloadDraftCenter();
+    } catch (error) { center.message.textContent = error.message; }
+    if(center.dialog.open)center.search.focus();
   }
 
   function toggleTaskPanel(forceHidden = null) {
@@ -568,7 +654,7 @@
 
   function commandDefinitions() {
     return [
-      { id: 'draft.center', label: '打开草稿中心', hint: 'GT / 评审 / 冲突副本', icon: 'FileText', run: openDraftCenter },
+      { id: 'draft.center', label: '打开草稿中心', hint: '失败回写备份 / 历史记录', icon: 'FileText', run: openDraftCenter },
       {
         id: 'workspace.viewer',
         label: '切换到表格查看',
@@ -1243,7 +1329,18 @@
   }
 
   function canvasToolDefinitions() {
-    return globalThis.__gtMapperCanvasToolRegistryV1?.list?.() || [];
+    return (globalThis.__gtMapperCanvasToolRegistryV1?.list?.() || []).filter(d => d.id !== 'machine-eval' || state.machineAvailable);
+  }
+
+  function syncMachineAvailability(row, config) {
+    state.machineAvailable = globalThis.__cyleFieldMappingV1.hasMachineResults(row, config);
+    if (!state.machineAvailable) {
+      const record = state.toolInstances.get('machine-eval');
+      if (record?.page) record.page.hidden = true;
+      record?.instance?.setActive?.(false);
+      if (state.activePageTool === 'machine-eval') state.activePageTool = 'human-eval';
+    }
+    renderWorkspaceNavigation();
   }
 
   function workspaceService() {
@@ -1309,7 +1406,7 @@
       const quickIds = ['viewer', 'machine-eval', 'human-eval', 'caption-review'];
       quickIds.forEach((id) => {
         const workspace = profiles.find((item) => item.id === id);
-        if (!workspace) return;
+        if (!workspace || (id === 'machine-eval' && !state.machineAvailable)) return;
         const tab = element('button', 'gtm-inspector-mode-tab');
         tab.type = 'button';
         tab.dataset.recipeId = workspace.id;
@@ -1331,6 +1428,7 @@
       '.gtm-inspector-mode-tab[data-workspace-id]'
     ).forEach((tab) => {
       tab.classList.toggle('is-active', tab.dataset.workspaceId === activeId);
+      if(tab.dataset.workspaceId==='human-eval')tab.querySelector('span').textContent=state.panel?.dataset.workType==='quality'?'质检':'人工评估';
     });
   }
 
@@ -1444,11 +1542,79 @@
       })
       .finally(() => {
         record.loadPromise = null;
+        updateCaseWriteButton();
       });
     return record.loadPromise;
   }
 
+  function activeCaseEditor() {
+    if (state.panel?.classList.contains('needs-work-selection')) return null;
+    const record = state.toolInstances.get(state.activePageTool);
+    if (!record || record.loadPromise || record.lastRevision !== state.rowRevision) return null;
+    const instance = record.instance;
+    return instance?.getWritebackEditor?.() || null;
+  }
+
+  function updateCaseWriteButton() {
+    const button = state.caseWriteButton;
+    if (!button) return;
+    const editor = activeCaseEditor();
+    button.hidden = !state.panel?.classList.contains('needs-work-selection') && !['human-eval', 'caption-review'].includes(state.activePageTool);
+    button.disabled = !editor?.caseWritable || !!(editor?.caseSession?.data?.dimension_weights && globalThis.__cyleCaseEvalV1?.weightIssue?.(editor.caseSession));
+    button.setAttribute('aria-busy', String(!!editor?.caseSession?.saving));
+    renderNoticeCenter();
+  }
+
+  function renderNoticeCenter() {
+    if (!state.noticeCenter) return;
+    const editor = activeCaseEditor(), session = editor?.caseSession;
+    // Fast saves should go straight to the result, rather than flash a busy message.
+    if (session?.saving) {
+      if (state.noticeSavingSession !== session) {
+        clearTimeout(state.noticeTimer);
+        state.noticeSavingSession = session;
+        state.noticeBusyReady = false;
+        state.noticeTimer = setTimeout(() => {state.noticeBusyReady = true;renderNoticeCenter();}, 350);
+      }
+      if (!state.noticeBusyReady) return;
+    } else {
+      clearTimeout(state.noticeTimer);
+      state.noticeSavingSession = null;
+      state.noticeBusyReady = false;
+    }
+    const weightIssue = session?.data?.dimension_weights ? globalThis.__cyleCaseEvalV1?.weightIssue?.(session) : '';
+    let message = '专注每一帧\n让世界更清晰', kind = 'idle', detail = '';
+    if (editor?.prefillError) {message = '当前作业无法编辑';kind = 'error';detail = editor.prefillError;}
+    else if (session?.saving) {message = '正在保存到飞书…';kind = 'loading';}
+    else if (session?.writeError) {message = '保存失败，请重试';kind = 'error';detail = session.writeError;}
+    else if (session?.actionError) {message = session.actionError;kind = 'error';}
+    else if (weightIssue) {message = weightIssue;kind = 'warning';detail = weightIssue;}
+    else if (session?.dirty) {message = '有修改待保存';kind = 'pending';}
+    else if (session?.notice) {message = session.notice.includes('日期未更新') ? '结果已保存，日期未更新' : '已保存到飞书';kind = 'success';}
+    // Routine read/navigation success should not interrupt the editing status.
+    const general = state.noticeGeneral;
+    if (general && ['error','warning'].includes(general.kind) && kind !== 'error') {
+      message = general.text;kind = general.kind;detail = general.text;
+    }
+    const text = detail && kind === 'error' ? `${message}：${detail}` : message;
+    if (state.noticeSummary.textContent !== text) state.noticeSummary.textContent = text;
+    state.noticeCenter.dataset.kind = kind;
+    state.noticeCenter.title = text;
+  }
+
+  function createNoticeCenter() {
+    const center = element('div', 'cyle-notice-center');
+    center.setAttribute('aria-label', '工作台提示');
+    const text = element('span', 'cyle-notice-summary-text', '专注每一帧\n让世界更清晰');
+    text.setAttribute('role', 'status');text.setAttribute('aria-live', 'polite');
+    center.append(text);
+    center.addEventListener('pointerdown', e => e.stopPropagation());
+    Object.assign(state, {noticeCenter:center, noticeSummary:text});
+    return center;
+  }
+
   function setCanvasToolsActive() {
+    updateCaseWriteButton();
     const visible = state.visibleColumns || new Set();
     state.toolInstances.forEach((record) => {
       const active = Boolean(
@@ -3122,6 +3288,7 @@
     const mapping = globalThis.__cyleFieldMappingV1;
     if (!row || state.error || mapping.key(row) !== mapping.key(state.row)) throw new Error('请先刷新当前工作表');
     const fields = mapping.read(row, config);
+    syncMachineAvailability(row, config);
     state.publicGroups = mapping.publicGroups(row, config);
     state.publicMappingError = "";
     const tools = [...(state.visibleColumns || [])].filter(key => String(key).startsWith('tool:'));
@@ -3138,7 +3305,7 @@
     root.id = ROOT_ID;
     root.hidden = true;
 
-    const panel = element('section', 'gtm-inspector-panel');
+    const panel = element('section', 'gtm-inspector-panel needs-work-selection');
     panel.setAttribute('role', 'dialog');
     panel.setAttribute('aria-label', `${EXTENSION_NAME} 标注工作台`);
 
@@ -3161,9 +3328,7 @@
     );
     headingCopy.append(eyebrow, title, subtitle);
     heading.append(brandMark, headingCopy);
-    const petMotto = element('div', 'cyle-pet-motto');
-    petMotto.setAttribute('aria-hidden', 'true');
-    heading.append(petMotto);
+    heading.append(createNoticeCenter());
 
     const actions = element('div', 'gtm-inspector-header-actions');
     const left = makeIconButton(
@@ -3214,7 +3379,6 @@
       root.dataset.cyleTheme = state.theme;
       themes.querySelectorAll('button').forEach(node => node.setAttribute('aria-pressed', String(node.dataset.theme === state.theme)));
       brandMark.title = state.theme === 'dark' ? '墨团 · 黑色绒面' : '绒绒 · 奶白织物';
-      petMotto.textContent = state.theme === 'dark' ? '专注每一帧\n让世界更清晰  🐾' : '温柔地看见\n让细节更有温度  🐾';
     };
     for (const [value, label] of [['dark', '黑'], ['light', '白']]) {
       const choice = element('button', '', label);
@@ -3511,9 +3675,8 @@
 
     inspectorWorkspace.append(toolbar, content);
     header.append(toolbar);
-    const status = element('footer', 'gtm-inspector-status', '点击扩展图标开始');
     const commandPaletteView = buildCommandPalette();
-    body.append(inspectorWorkspace, status);
+    body.append(inspectorWorkspace);
     panel.append(header, body);
     root.append(panel, commandPaletteView.palette);
     document.documentElement.append(root);
@@ -3524,7 +3687,6 @@
     state.body = body;
     state.title = title;
     state.subtitle = subtitle;
-    state.status = status;
     state.search = search;
     state.columnList = columnList;
     state.cards = cardsPane;
@@ -3991,7 +4153,7 @@
       }
     }
     savePreferences();
-    renderStatus(`已切换到“${recipe.label}”：${recipe.description}`, 'success');
+    renderSummaryStatus();
   }
 
   function setColumnVisible(columnIndex, visible, label = '') {
@@ -4150,7 +4312,9 @@
         state.questionIdentityHeader = publicConfig ? globalThis.__cyleFieldMappingV1.read(nextRow,publicConfig).find(f=>f.isIdentity)?.source.header : '';
       } catch (error) { state.publicGroups = new Map(); state.publicMappingError = error.message; }
       if (token !== state.requestToken) return;
+      syncMachineAvailability(nextRow, state.publicMappingError ? null : publicConfig);
       if (!previousRow || rowIdentity(previousRow) !== rowIdentity(nextRow)) globalThis.__cyleSelectedModelVideoV1 = null;
+      globalThis.__cyleCaseEvalV1?.acceptFreshRow();
       state.row = nextRow;
       state.workspaceComposer?.setRow();
       state.rowRevision += 1;
@@ -5322,7 +5486,9 @@
       formatBytes(attachment?.size)
     ].filter(Boolean).join(' · ');
     box.append(name);
-    if (detail) box.append(element('span', 'gtm-inspector-attachment-detail', detail));
+    const isModelVideo = kind === 'video' && state.publicGroups?.get(cell.columnIndex)?.has('answer');
+    if (isModelVideo) name.hidden = true;
+    if (detail && !isModelVideo) box.append(element('span', 'gtm-inspector-attachment-detail', detail));
 
     const url = kind === 'video' || kind === 'audio' || kind === 'image'
       ? attachment?.downloadUrl || cell.url || attachment?.thumbUrl || ''
@@ -6200,6 +6366,17 @@
       });
       state.publicMaterialsToggle.classList.add('cyle-public-toggle');
       state.modeTabs.append(state.publicMaterialsToggle);
+      state.caseWriteButton = makeCommandButton('写回飞书', 'Save', async () => {
+        const editor = activeCaseEditor();
+        if (!editor?.caseWritable) return;
+        await editor.writeHumanResult();
+        updateCaseWriteButton();
+      }, 'is-case-write');
+      state.caseWriteButton.querySelector('.gtm-button-label')?.remove();
+      state.modeTabs.append(state.caseWriteButton);
+      document.addEventListener('cyle:case-save-status', updateCaseWriteButton);
+      document.addEventListener('cyle:case-write-conflict', event => showCaseConflict(event.detail.session));
+      updateCaseWriteButton();
       state.pageTools.append(state.modeTabs);
       applyPublicMaterialsVisibility();
       state.pageToolBody = element('div', 'cyle-tool-page-body');
@@ -6377,7 +6554,13 @@
       }
       record.cell = cell;
       record.card.classList.toggle('is-model-selected', globalThis.__cyleSelectedModelVideoV1?.tableKey === state.row.tableKey && globalThis.__cyleSelectedModelVideoV1?.rowIndex === state.row.rowIndex && globalThis.__cyleSelectedModelVideoV1?.columnIndex === cell.columnIndex);
-      record.title.textContent = `${cell.columnLetter || ''} · ${cell.header || '未命名字段'} · 第 ${state.row.rowNumber} 行`;
+      const modelVideoNames = state.publicGroups?.get(cell.columnIndex)?.has('answer')
+        ? (cell.attachments || []).filter(item => item.kind === 'video').map(item => item.fileName).filter(Boolean) : [];
+      record.card.classList.toggle('has-model-video-title', modelVideoNames.length > 0);
+      record.title.textContent = modelVideoNames.length
+        ? `${cell.header || '未命名字段'} · ${modelVideoNames.join(' / ')}`
+        : `${cell.columnLetter || ''} · ${cell.header || '未命名字段'} · 第 ${state.row.rowNumber} 行`;
+      record.title.title = record.title.textContent;
       record.placeholder.firstChild.textContent = `${cell.header || key} · 第 ${state.row.rowNumber} 行 · 已浮出`;
       record.edit.hidden = !editableCell(cell) || isDropdownCell(cell);
       const editor = state.cellEditors.get(editorKey(cell));
@@ -6405,6 +6588,18 @@
         video.addEventListener('timeupdate', () => updatePublicFloatCaption(record));
         video.addEventListener('loadedmetadata', () => { if (record.floating && !record.freeVideoSize && !record.card.classList.contains('is-collapsed')) sizePublicFloat(record, record.card.offsetWidth); });
         playback.add(video, { id, offsetSeconds: 0, autoBind: false }); record.mediaIds.push(id);
+        // Model videos keep independent playheads; only the actively playing
+        // model owns playback. Selection, seeking and pausing never start peers.
+        video.addEventListener('play', () => {
+          if (video.paused || !video.isConnected || !record.content.contains(video)
+            || !state.publicGroups?.get(record.cell.columnIndex)?.has('answer')) return;
+          state.pageFields.forEach(other => {
+            if (!state.publicGroups?.get(other.cell.columnIndex)?.has('answer')) return;
+            other.content.querySelectorAll('video').forEach(peer => {
+              if (peer !== video && !peer.paused) peer.pause();
+            });
+          });
+        });
         const updateMetadata = () => {
           if (!playback.has(id)) return;
           globalThis.__cyleMediaServiceV1.workspace.timebases.set(id, video.cyleTimebase);
@@ -6860,27 +7055,15 @@
   }
 
   function renderStatus(message, kind = '') {
-    if (!state.status) return;
-    state.status.textContent = message;
-    state.status.dataset.kind = kind;
+    if (!state.noticeCenter) return;
+    state.noticeGeneral = message ? {text:message, title:message, kind} : null;
+    renderNoticeCenter();
   }
 
   function renderSummaryStatus() {
     if (!state.row) return;
     const duplicateCount = state.row.columns.filter(({ duplicate }) => duplicate).length;
-    const visibleTools = canvasToolDefinitions().filter(({ key, id }) => (
-      state.visibleColumns?.has(key || toolKey(id))
-    )).length;
-    const visibleFields = [...(state.visibleColumns || [])].filter((key) => (
-      String(key).startsWith('column:')
-    )).length;
-    renderStatus([
-      `已显示 ${visibleFields}/${state.row.columns.length} 列`,
-      visibleTools ? `${visibleTools} 个工具` : '',
-      '公共资料跨工具保留 · 页面布局',
-      duplicateCount ? `检测到 ${duplicateCount} 个重复表头列` : '',
-      state.live ? '自动跟随选区' : '已暂停跟随'
-    ].filter(Boolean).join(' · '), duplicateCount ? 'warning' : 'success');
+    renderStatus(duplicateCount ? `检测到 ${duplicateCount} 个重复表头列，请在题库映射中核对` : '', duplicateCount ? 'warning' : '');
     updateTaskPanel();
   }
 
@@ -6895,6 +7078,7 @@
       state.pageToolBody.replaceChildren(element('div', 'gtm-inspector-error', message));
     }
     renderStatus(message, 'error');
+    updateCaseWriteButton();
   }
 
   function render() {
@@ -7018,20 +7202,22 @@
     state.harnessUnsubscribe = null;
   });
 
-  const draftStorageChanged = () => {
+  const draftStorageChanged = (changes, area) => {
+    if(area&&area!=='local')return;
+    const relevant=Object.keys(changes||{}).some(key=>/^cyle:v\d+:draft:/.test(key)||key.startsWith('cyle-caption-draft:')||globalThis.__cyleDraftServiceV1?.legacyKeys?.includes(key));
+    if(!relevant)return;
+    const visibleTask=state.open&&!state.root?.classList.contains('cyle-page-shell')&&!state.taskPanel?.hidden;
+    if(!state.draftCenter?.dialog.open&&!visibleTask)return;
     clearTimeout(state.draftCenterTimer);
     state.draftCenterTimer = setTimeout(() => {
       if (state.draftCenter?.dialog.open) reloadDraftCenter();
-      else if (state.open) updateStorageStatus();
+      else if (visibleTask) updateStorageStatus();
     }, 400);
   };
   chrome.storage?.onChanged?.addListener(draftStorageChanged);
 
   const preferencesReady = loadPreferences().then(() => {
     renderLiveState();
-    globalThis.__cyleDraftServiceV1?.cleanupExpired?.({
-      namespace: null
-    }).catch(() => {});
   });
 
   globalThis[INSPECTOR_KEY] = {

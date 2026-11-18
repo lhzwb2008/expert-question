@@ -165,6 +165,8 @@
       return normalized;
     }
 
+    getWritebackEditor() { return this.instance?.getWritebackEditor?.() || null; }
+
     playbackRange(options) {
       try { return this.instance?.playbackRange?.(options) || null; }
       catch (_) { return null; }

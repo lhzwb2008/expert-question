@@ -75,8 +75,12 @@
         if(models.length!==1)throw new Error('此视频未绑定唯一模型，请在组装中核对。');
         const model=models[0],fields=mapped.filter(item=>owner(config.fields.find(f=>f.id===item.id)).id===model.id);
         if(this.renderHumanPage){await this.renderHumanPage(fields,config,model);return;}
-        const typed=fields.map(item=>{let json=null;try{json=JSON.parse(value(item.cell));}catch{}return {...item,json};});
-        const results=typed.filter(item=>item.json?.schema==='tier-result/1'),rubrics=typed.filter(item=>item.json?.schema==='deduction-rubric/1');
+        const roleOf=item=>config.fields.find(f=>f.id===item.id)?.role;
+        const machineFields=fields.filter(item=>roleOf(item)==='机评');
+        if(!machineFields.length){this.body.append(el('p','当前模型未配置机器评估结果列。','empty'));return;}
+        if(machineFields.length===1&&!value(machineFields[0].cell).trim()){this.body.append(el('p','本题暂无机器结果。','empty'));return;}
+        const typed=fields.filter(item=>['机评','rubric'].includes(roleOf(item))).map(item=>{let json=null;try{json=JSON.parse(value(item.cell));}catch{}return {...item,json};});
+        const results=typed.filter(item=>roleOf(item)==='机评'&&item.json?.schema==='tier-result/1'),rubrics=typed.filter(item=>roleOf(item)==='rubric'&&item.json?.schema==='deduction-rubric/1');
         const raw=()=>{const d=lazyDetails('原始数据',()=>typed.filter(item=>item.json||/机评|rubric/i.test(item.label)).flatMap(item=>[el('h4',`${M.letter(item.source.index)} · ${item.source.header}`),el('pre',value(item.cell))]));this.rawPanel=d;(this.details||this.body).append(d);};
         if(results.length!==1||rubrics.length>1){this.body.append(el('p',results.length>1||rubrics.length>1?'映射中有多个机评或 rubric，暂不自动合并，请核对来源。':'该模型暂无有效的 tier-result/1 机评结果。','empty'));raw();return;}
         const result=results[0].json,rubric=rubrics[0]?.json||null,id=mapped.find(f=>f.id===config.identityFieldId)?.value;

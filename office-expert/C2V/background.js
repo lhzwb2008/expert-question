@@ -32,8 +32,7 @@ const INSPECTOR_SHELL_FILES = [
   'content/canvas-tool-registry.js',
   'content/builtin-canvas-tools.js',
   'content/composer-styles.js',
-  'services/human-rubric-service.js',
-  'content/human-rubric-editor.js',
+  'services/question-rubric-service.js',
   'content/workspace-composer.js',
   'services/field-mapping-service.js',
   'content/field-mapping-panel.js',
@@ -447,13 +446,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       : store.writeRecord(message.input);
     task.then(result => sendResponse({ ok: true, result }))
       .catch(error => sendResponse({ ok: false, code: error.code, error: error.message }));
-    return true;
-  }
-  if (message?.type === 'GET_HUMAN_RUBRIC_DEFAULT') {
-    fetch(chrome.runtime.getURL('docs/config-drafts/human-rubric.v1.json'))
-      .then(response => { if (!response.ok) throw new Error('默认评分配置读取失败'); return response.json(); })
-      .then(config => sendResponse({ok:true,config}))
-      .catch(error => sendResponse({ok:false,error:error.message}));
     return true;
   }
   if (message?.type === 'HARNESS_LOAD_BLOCK') {

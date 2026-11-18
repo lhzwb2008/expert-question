@@ -501,6 +501,13 @@
   function catalogEntry(record, caption = false) {
     const value = record.value || {}, inferred = legacyContext(record.id, caption);
     const target = { ...inferred, ...value.context };
+    if(['case-eval','case-eval-recovery'].includes(record.namespace)){
+      const recovery=record.namespace==='case-eval-recovery';
+      return {id:`${record.namespace}:${record.id}`,storageId:record.id,namespace:record.namespace,revision:record.revision,
+        kind:'整题',target,status:record.expired?'已过期':!recovery?'历史草稿':value.recoveryStatus==='resolved'?'已解决备份':value.recoveryStatus==='conflict'?'内容冲突':value.recoveryStatus==='failed'?'回写失败':'回写未确认',
+        updatedAt:record.updatedAt||'',expired:record.expired===true,value,
+        changes:[{columnIndex:target.columnIndex,header:target.header,before:value.baseline||'',after:JSON.stringify(value.data||{},null,2),representation:recovery?'回写备份（不自动恢复）':'历史草稿（不自动恢复）'}]};
+    }
     if(record.namespace==='human-eval-form')return {
       id:`${record.namespace}:${record.id}`,storageId:record.id,namespace:record.namespace,
       kind:'人评',target:{...target,templateId:value.templateId},

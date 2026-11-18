@@ -28,7 +28,7 @@
       .values{display:flex;flex-wrap:wrap;gap:7px;margin-top:9px}.tag{white-space:normal;overflow-wrap:anywhere;text-align:left;padding:5px 10px;border:1px solid transparent;border-radius:7px;background:var(--pet-raised);font-size:12px;line-height:1.5;box-shadow:inset 0 1px 1px var(--pet-lip,#fff1)}
       .tag[aria-pressed=true]{color:var(--pet-text);border-color:var(--pet-accent);background:color-mix(in srgb,var(--pet-accent) 14%,var(--pet-surface));outline:1px dashed color-mix(in srgb,var(--pet-accent) 38%,transparent);outline-offset:-4px;box-shadow:inset 0 1px 2px var(--pet-lip,#fff2),0 1px 2px var(--pet-shade,#0002)}
       .foot{border-top:1px solid var(--pet-border)}.match-count,.notice{margin:0;font-size:11px;color:var(--pet-muted)}.notice{padding:0 14px 7px;white-space:pre-wrap;color:var(--pet-accent);flex:none}.notice:empty{display:none}.match-count{padding-top:12px}
-      .work-bar{display:flex;align-items:center;gap:5px;max-width:340px}.work-name{max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;color:var(--pet-muted)}.work-bar select{width:92px;max-width:120px;padding:5px 6px;background:var(--pet-raised);border-radius:6px}.work-notice{position:fixed;z-index:100;max-width:320px;padding:7px 10px;background:var(--pet-raised);border:1px solid var(--pet-border);border-radius:6px;font-size:11px;color:var(--pet-text)}
+      .work-bar select[aria-label="选择工作区"]{width:155px;max-width:180px}.work-bar{display:flex;align-items:center;gap:5px;max-width:420px}.work-name{max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;color:var(--pet-muted)}.work-bar select{width:92px;max-width:120px;padding:5px 6px;background:var(--pet-raised);border-radius:6px}.work-notice{position:fixed;z-index:100;max-width:320px;padding:7px 10px;background:var(--pet-raised);border:1px solid var(--pet-border);border-radius:6px;font-size:11px;color:var(--pet-text)}
     `;
     root.append(style);workRoot.append(style.cloneNode(true));
     const bar=el('div','','bar'),popup=el('div','','popup'),workBar=el('div','','work-bar'),workNotice=el('div','','work-notice');
@@ -41,14 +41,30 @@
     const allFields=()=>[...defs,...works.flatMap(w=>w.person?[w.person]:[])];
     function filter(source){return source.filter(item=>selected().every(([key,values])=>tokens(item.filterValues?.[key]).some(v=>values.includes(v))));}
     function store(){const record={values:structuredClone(conditions),headers:conditionHeaders,work:selectedWork};cache.set(currentTable,record);chrome.storage.local.set({['cyleQuestionFiltersV1:'+currentTable]:record}).catch(()=>notice('筛选条件暂未保存到本机。'));}
-    function changed(){conditionHeaders=Object.fromEntries(allFields().map(f=>[fieldKey(f),f.source.header]));store();renderBar();renderPopup();onChange();}
+    function publishWork(){
+      const panel=parent.closest('.gtm-inspector-panel');
+      const valid=!!row&&works.some(w=>w.id===selectedWork);
+      if(panel){
+        panel.classList.toggle('needs-work-selection',!valid);panel.dataset.workType=valid?works.find(w=>w.id===selectedWork).workType||'':'';
+        const quality=panel.dataset.workType==='quality',tab=panel.querySelector('[data-recipe-id="human-eval"]');
+        if(tab?.querySelector('span'))tab.querySelector('span').textContent=quality?'质检':'人工评估';
+        if(quality&&panel.querySelector('[data-recipe-id="caption-review"].is-active'))tab?.click();
+      }
+      if(!row)return;const next={tableKey:globalThis.__cyleFieldMappingV1.key(row),id:selectedWork};
+      if(JSON.stringify(globalThis.__cyleSelectedWorkItemV1)!==JSON.stringify(next)){globalThis.__cyleSelectedWorkItemV1=next;document.dispatchEvent(new CustomEvent('cyle:work-item-selected',{detail:next}));}
+    }
+    const workSelection=event=>{if(event.detail?.tableKey!==currentTable||event.detail.id===selectedWork)return;if(event.detail.id&&!works.some(w=>w.id===event.detail.id))return;selectedWork=event.detail.id;changed();};
+    document.addEventListener('cyle:work-item-selected',workSelection);
+    function changed(){publishWork();conditionHeaders=Object.fromEntries(allFields().map(f=>[fieldKey(f),f.source.header]));store();renderBar();renderPopup();onChange();}
     function chooseWork(id){
       for(const work of works)if(work.person)delete conditions[fieldKey(work.person)];
       selectedWork=selectedWork===id?'':id;changed();
+      const panel=parent.closest('.gtm-inspector-panel');
+      if(selectedWork&&!panel?.querySelector('[data-recipe-id="human-eval"].is-active,[data-recipe-id="caption-review"].is-active'))panel?.querySelector('[data-recipe-id="human-eval"]')?.click();
     }
     async function setRow(next){
       const token=++epoch;row=next;
-      if(!next){defs=[];works=[];renderBar();renderPopup();return;}
+      if(!next){defs=[];works=[];publishWork();renderBar();renderPopup();return;}
       const M=globalThis.__cyleFieldMappingV1,config=await M.load(next);if(token!==epoch)return;
       const table=M.key(next);
       if(table!==currentTable){
@@ -60,15 +76,15 @@
       for(const f of fields){
         const original=config.fields.find(x=>x.id===f.id),entity=config.entities?.find(e=>e.id===original.entityId),role=original.role||original.label.split(' · ').at(-1);
         if(entity?.type==='work'||f.group==='人员与状态'){
-          const id=entity?.id||original.label.split(' · ')[0];if(!byWork.has(id))byWork.set(id,{id,name:entity?.name||id});
-          const work=byWork.get(id);if(/人员|同学/.test(role))work.person=f;if(/状态/.test(role))work.status=f;
+          const id=entity?.id||original.label.split(' · ')[0];if(!byWork.has(id))byWork.set(id,{id,name:entity?.name||id,workType:entity?.workType});
+          const work=byWork.get(id);if(role==='人员')work.person=f;if(role==='状态')work.status=f;
         }else if(original.entityId==='tags'&&!f.isIdentity&&!seen.has(fieldKey(f))){defs.push({...f,name:f.source.header});seen.add(fieldKey(f));}
       }
       works=[...byWork.values()];if(!works.some(w=>w.id===selectedWork))selectedWork='';
       for(const key of Object.keys(conditions))if(!Array.isArray(conditions[key])||!allFields().some(f=>fieldKey(f)===key&&(!conditionHeaders[key]||conditionHeaders[key]===f.source.header)))delete conditions[key];
       // Legacy person filters can only remain on the one explicitly selected work project.
       for(const work of works)if(work.id!==selectedWork&&work.person)delete conditions[fieldKey(work.person)];
-      renderBar();renderPopup();
+      publishWork();renderBar();renderPopup();
     }
     function position(){
       if(!popup.matches(':popover-open'))return;
@@ -86,8 +102,11 @@
       renderWorkBar();
     }
     function renderWorkBar(){
-      workBar.replaceChildren();const work=works.find(w=>w.id===selectedWork);workHost.hidden=!work;if(!work)return;
-      const label=el('span',work.name,'work-name');label.title=work.name;workBar.append(label);
+      workBar.replaceChildren();const work=works.find(w=>w.id===selectedWork);workHost.hidden=false;
+      const workspace=el('select');workspace.setAttribute('aria-label','选择工作区');workspace.append(new Option('请选择工作区',''));
+      for(const w of works)workspace.append(new Option(`${w.workType==='quality'?'质检':'标注'} · ${w.name}`,w.id));
+      workspace.value=work?.id||'';workspace.onchange=()=>chooseWork(workspace.value);workBar.append(workspace);
+      if(!work)return;
       if(work.person){
         const key=fieldKey(work.person),select=el('select');select.setAttribute('aria-label',`名字筛选 ${work.name}`);
         select.append(new Option('全部人员',''));
@@ -123,16 +142,14 @@
         if(primary)heading.append(el('strong',name));else{box.open=selectedCount>0||expanded.has(key)||!!query;box.addEventListener('toggle',()=>{if(box.open)expanded.add(key);else expanded.delete(key);});}
         box.append(heading);body.append(box);return box;
       }
-      const typeFields=defs.filter(f=>/^(题型|题目类型)$/.test(f.name));
       const renderField=(f,primary)=>{
         const key=fieldKey(f),values=conditions[key]||[],options=[...new Set([...items.flatMap(i=>tokens(i.filterValues?.[key])),...values])].sort((a,b)=>a.localeCompare(b,'zh-CN'));
         const matching=options.filter(v=>!query||f.name.toLocaleLowerCase().includes(query)||v.toLocaleLowerCase().includes(query));if(query&&!matching.length)return;
         const box=group(f.name,key,values.length,primary),list=el('div','','values');
         for(const value of matching){const tag=button(value||'未填写',()=>{const current=conditions[key]||[],next=current.includes(value)?current.filter(v=>v!==value):[...current,value];if(next.length)conditions[key]=next;else delete conditions[key];changed();});tag.className='tag';tag.setAttribute('aria-label',value||'未填写');tag.setAttribute('aria-pressed',String(values.includes(value)));list.append(tag);}box.append(list);
       };
-      typeFields.forEach(f=>renderField(f,true));
       if(works.length){const box=group('工作项目','work',selectedWork?1:0,true),list=el('div','','values');for(const work of works.filter(w=>!query||w.name.toLocaleLowerCase().includes(query))){const tag=button(work.name,()=>chooseWork(work.id));tag.className='tag';tag.setAttribute('aria-pressed',String(work.id===selectedWork));list.append(tag);}box.append(list);}
-      defs.filter(f=>!typeFields.includes(f)).forEach(f=>renderField(f,false));
+      defs.forEach(f=>renderField(f,false));
       search.oninput=()=>{searchQuery=search.value;renderPopup();const next=popup.querySelector('.tag-search');next.focus();next.setSelectionRange?.(searchQuery.length,searchQuery.length);};
       popup.append(body);body.scrollTop=previous;
       const note=el('p',message,'notice');note.setAttribute('role','status');popup.append(note);
@@ -145,7 +162,7 @@
     const resize=()=>position();window.addEventListener('resize',resize);
     const observer=new ResizeObserver(resize);observer.observe(host);renderBar();
     return {setRow,filter,columns:()=>[...new Map(allFields().map(f=>[fieldKey(f),f.source])).values()],signature:()=>JSON.stringify(allFields().map(f=>f.source)),hasFilters:()=>selected().length>0,
-      receive(value){items=value||[];renderPopup();renderBar();},close(){if(popup.matches(':popover-open'))popup.hidePopover();},dispose(){document.removeEventListener('pointerdown',dismiss,true);window.removeEventListener('resize',resize);observer.disconnect();host.remove();workHost.remove();}};
+      receive(value){items=value||[];renderPopup();renderBar();},close(){if(popup.matches(':popover-open'))popup.hidePopover();},dispose(){document.removeEventListener('cyle:work-item-selected',workSelection);document.removeEventListener('pointerdown',dismiss,true);window.removeEventListener('resize',resize);observer.disconnect();host.remove();workHost.remove();}};
   }
   globalThis.__cyleQuestionFiltersV1=Object.freeze({create});
 })();

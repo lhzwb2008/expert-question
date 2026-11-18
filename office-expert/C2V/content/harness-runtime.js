@@ -256,6 +256,8 @@
       return this.instance?.invoke('flushDrafts', [], { propagate: true });
     }
 
+    getWritebackEditor() { return this.instance?.getWritebackEditor() || null; }
+
     playbackRange(options) {
       return this.instance?.playbackRange(options) || null;
     }
