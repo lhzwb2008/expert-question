@@ -19,6 +19,11 @@ ENV = Path.home() / "workspace" / "Quantra" / ".env"
 
 PLAN = {
     "港股红利": dict(start=date(2025, 7, 1), end=date(2026, 10, 30)),
+    "基准复算": dict(start=date(2023, 12, 1), end=date(2026, 10, 30), tickers=[
+        "AAPL.US", "MSFT.US", "NVDA.US", "GOOGL.US", "AMZN.US", "META.US", "AVGO.US", "TSLA.US", "NFLX.US", "ORCL.US",
+        "CRM.US", "AMD.US", "ADBE.US", "CSCO.US", "INTC.US", "QCOM.US", "NOW.US", "LRCX.US", "KLAC.US", "ANET.US",
+        "PLTR.US", "MU.US", "TXN.US", "IBM.US"]),
+    "雪球回测": dict(start=date(2016, 11, 1), end=date(2026, 10, 30), tickers=["510500.SH", "512100.SH", "000905.SH", "000852.SH"]),
 }
 
 
@@ -35,7 +40,7 @@ def main() -> None:
     ctx = QuoteContext(Config.from_apikey_env())
     for name in sys.argv[1:] or list(PLAN):
         plan = PLAN[name]
-        tickers = sorted(p.stem for p in (DATA / name).glob("*.HK.json"))
+        tickers = plan.get("tickers") or sorted(p.stem for p in (DATA / name).glob("*.HK.json"))
         out = DATA / f"{name}_longport"
         out.mkdir(parents=True, exist_ok=True)
         info_path = out / "static_info.json"

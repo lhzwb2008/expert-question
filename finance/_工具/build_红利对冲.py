@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """打包「港股红利组合恒指期货对冲与保证金储备核定」（三轮链的第三轮）：题目附件、标准答案附件。
 
-输入是第二轮标准答案《港股红利组合建仓方案表.xlsx》的「建仓清单」和「汇总」（评测时由项目组从前题标答提供，不放进本题附件），
+输入是第二轮标准答案《港股红利组合建仓方案表.xlsx》的「建仓清单」和「汇总」（原样复制进本题的题目附件），
 加上本题自己的附件：A01 候选池前复权日线（LongPort，换成以基准日为锚点）、A02 对冲口径、A03 保证金储备与交付，
 以及恒生指数日线的 MCP 结果文件。保证金标准是 A03 里拟的。
 
@@ -128,9 +128,10 @@ def main() -> None:
     copy_as(DOC / "A02_对冲口径.md", att / f"{PREFIX}A02_对冲口径.md")
     copy_as(DOC / "A03_保证金储备与交付.md", att / f"{PREFIX}A03_保证金储备与交付.md")
     copy_as(DST / "MCP结果文件" / MCP_FILE, att / MCP_FILE)
+    copy_as(PREV, att / PREV.name)
 
     # 2. 只用第二轮建仓方案表、本题附件和 MCP 结果文件重算
-    hold, assets, cash, mv = read_plan(PREV)
+    hold, assets, cash, mv = read_plan(att / PREV.name)
     assert sum(h["sh"] * h["close"] for h in hold) == mv
     a01 = pd.read_csv(att / f"{PREFIX}A01_候选池前复权日线.csv", dtype={"code": str, "date": str, "adj_close": str})
     prices = a01.pivot(index="date", columns="code", values="adj_close").sort_index()

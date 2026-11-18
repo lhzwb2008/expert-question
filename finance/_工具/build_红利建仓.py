@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """打包「港股红利组合建仓权重与税后股息率测算」（三轮链的第二轮）：题目附件、标准答案附件。
 
-输入是第一轮标准答案《港股红利候选池筛选表.xlsx》的「入选名单」（评测时由项目组从前题标答提供，不放进本题附件），
+输入是第一轮标准答案《港股红利候选池筛选表.xlsx》的「入选名单」（原样复制进本题的题目附件），
 加上本题自己的附件：A01 证券资料（每手股数来自 LongPort，税务类别是下面 TAX 里拟的）、A02 建仓口径、A03 产品要素，
 以及港币兑人民币汇率的 MCP 结果文件。
 
@@ -142,9 +142,10 @@ def main() -> None:
     copy_as(DOC / "A02_建仓口径.md", att / f"{PREFIX}A02_建仓口径.md")
     copy_as(DOC / "A03_产品要素与交付.md", att / f"{PREFIX}A03_产品要素与交付.md")
     copy_as(DST / "MCP结果文件" / MCP_FILE, att / MCP_FILE)
+    copy_as(PREV, att / PREV.name)
 
     # 2. 只用第一轮筛选表、本题附件和 MCP 结果文件重算
-    sel = read_selection(PREV)
+    sel = read_selection(att / PREV.name)
     a01 = list(csv.DictReader(open(att / f"{PREFIX}A01_证券资料.csv", encoding="utf-8")))
     lots = {r["code"]: int(r["lot_size"]) for r in a01}
     taxes = {r["code"]: r["tax_type"] for r in a01}
