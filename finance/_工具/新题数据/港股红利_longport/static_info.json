@@ -1,0 +1,272 @@
+[
+ {
+  "symbol": "0002.HK",
+  "name_cn": "中电控股",
+  "name_hk": "中電控股",
+  "name_en": "CLP HOLDINGS",
+  "lot_size": 500,
+  "currency": "HKD",
+  "total_shares": 2526450570
+ },
+ {
+  "symbol": "0003.HK",
+  "name_cn": "香港中华煤气",
+  "name_hk": "香港中華煤氣",
+  "name_en": "HK & CHINA GAS",
+  "lot_size": 1000,
+  "currency": "HKD",
+  "total_shares": 18659870098
+ },
+ {
+  "symbol": "0005.HK",
+  "name_cn": "汇丰控股",
+  "name_hk": "匯豐控股",
+  "name_en": "HSBC HOLDINGS",
+  "lot_size": 400,
+  "currency": "HKD",
+  "total_shares": 17124644983
+ },
+ {
+  "symbol": "0006.HK",
+  "name_cn": "电能实业",
+  "name_hk": "電能實業",
+  "name_en": "POWER ASSETS",
+  "lot_size": 500,
+  "currency": "HKD",
+  "total_shares": 2131105154
+ },
+ {
+  "symbol": "0016.HK",
+  "name_cn": "新鸿基地产",
+  "name_hk": "新鴻基地產",
+  "name_en": "SHK PPT",
+  "lot_size": 500,
+  "currency": "HKD",
+  "total_shares": 2897780274
+ },
+ {
+  "symbol": "0177.HK",
+  "name_cn": "江苏宁沪高速公路",
+  "name_hk": "江蘇寧滬高速公路",
+  "name_en": "JIANGSU EXPRESS",
+  "lot_size": 2000,
+  "currency": "HKD",
+  "total_shares": 5037747500
+ },
+ {
+  "symbol": "0386.HK",
+  "name_cn": "中国石油化工股份",
+  "name_hk": "中國石油化工股份",
+  "name_en": "SINOPEC CORP",
+  "lot_size": 2000,
+  "currency": "HKD",
+  "total_shares": 120714479172
+ },
+ {
+  "symbol": "0548.HK",
+  "name_cn": "深圳高速公路股份",
+  "name_hk": "深圳高速公路股份",
+  "name_en": "SHENZHENEXPRESS",
+  "lot_size": 2000,
+  "currency": "HKD",
+  "total_shares": 2537856127
+ },
+ {
+  "symbol": "0728.HK",
+  "name_cn": "中国电信",
+  "name_hk": "中國電信",
+  "name_en": "CHINA TELECOM",
+  "lot_size": 2000,
+  "currency": "HKD",
+  "total_shares": 91507138699
+ },
+ {
+  "symbol": "0762.HK",
+  "name_cn": "中国联通",
+  "name_hk": "中國聯通",
+  "name_en": "CHINA UNICOM",
+  "lot_size": 2000,
+  "currency": "HKD",
+  "total_shares": 30598124345
+ },
+ {
+  "symbol": "0823.HK",
+  "name_cn": "领展房产基金",
+  "name_hk": "領展房產基金",
+  "name_en": "LINK REIT",
+  "lot_size": 100,
+  "currency": "HKD",
+  "total_shares": 2588998106
+ },
+ {
+  "symbol": "0836.HK",
+  "name_cn": "华润电力",
+  "name_hk": "華潤電力",
+  "name_en": "CHINA RES POWER",
+  "lot_size": 2000,
+  "currency": "HKD",
+  "total_shares": 5177057740
+ },
+ {
+  "symbol": "0857.HK",
+  "name_cn": "中国石油股份",
+  "name_hk": "中國石油股份",
+  "name_en": "PETROCHINA",
+  "lot_size": 2000,
+  "currency": "HKD",
+  "total_shares": 183020977818
+ },
+ {
+  "symbol": "0883.HK",
+  "name_cn": "中国海洋石油",
+  "name_hk": "中國海洋石油",
+  "name_en": "CNOOC",
+  "lot_size": 1000,
+  "currency": "HKD",
+  "total_shares": 47529953984
+ },
+ {
+  "symbol": "0902.HK",
+  "name_cn": "华能国际电力股份",
+  "name_hk": "華能國際電力股份",
+  "name_en": "HUANENG POWER",
+  "lot_size": 2000,
+  "currency": "HKD",
+  "total_shares": 15698093359
+ },
+ {
+  "symbol": "0914.HK",
+  "name_cn": "海螺水泥",
+  "name_hk": "海螺水泥",
+  "name_en": "CONCH CEMENT",
+  "lot_size": 500,
+  "currency": "HKD",
+  "total_shares": 5256403544
+ },
+ {
+  "symbol": "0939.HK",
+  "name_cn": "建设银行",
+  "name_hk": "建設銀行",
+  "name_en": "CCB",
+  "lot_size": 1000,
+  "currency": "HKD",
+  "total_shares": 261600381459
+ },
+ {
+  "symbol": "0941.HK",
+  "name_cn": "中国移动",
+  "name_hk": "中國移動",
+  "name_en": "CHINA MOBILE",
+  "lot_size": 500,
+  "currency": "HKD",
+  "total_shares": 21702251023
+ },
+ {
+  "symbol": "1088.HK",
+  "name_cn": "中国神华",
+  "name_hk": "中國神華",
+  "name_en": "CHINA SHENHUA",
+  "lot_size": 500,
+  "currency": "HKD",
+  "total_shares": 21689434304
+ },
+ {
+  "symbol": "1171.HK",
+  "name_cn": "兖矿能源",
+  "name_hk": "兗礦能源",
+  "name_en": "YANKUANG ENERGY",
+  "lot_size": 2000,
+  "currency": "HKD",
+  "total_shares": 10036852020
+ },
+ {
+  "symbol": "1288.HK",
+  "name_cn": "农业银行",
+  "name_hk": "農業銀行",
+  "name_en": "ABC",
+  "lot_size": 1000,
+  "currency": "HKD",
+  "total_shares": 349983033873
+ },
+ {
+  "symbol": "1398.HK",
+  "name_cn": "工商银行",
+  "name_hk": "工商銀行",
+  "name_en": "ICBC",
+  "lot_size": 1000,
+  "currency": "HKD",
+  "total_shares": 356406257089
+ },
+ {
+  "symbol": "1898.HK",
+  "name_cn": "中煤能源",
+  "name_hk": "中煤能源",
+  "name_en": "CHINA COAL",
+  "lot_size": 1000,
+  "currency": "HKD",
+  "total_shares": 13258663400
+ },
+ {
+  "symbol": "1919.HK",
+  "name_cn": "中远海控",
+  "name_hk": "中遠海控",
+  "name_en": "COSCO SHIP HOLD",
+  "lot_size": 500,
+  "currency": "HKD",
+  "total_shares": 15218324687
+ },
+ {
+  "symbol": "1972.HK",
+  "name_cn": "太古地产",
+  "name_hk": "太古地產",
+  "name_en": "SWIREPROPERTIES",
+  "lot_size": 200,
+  "currency": "HKD",
+  "total_shares": 5757484800
+ },
+ {
+  "symbol": "2318.HK",
+  "name_cn": "中国平安",
+  "name_hk": "中國平安",
+  "name_en": "PING AN",
+  "lot_size": 500,
+  "currency": "HKD",
+  "total_shares": 18107641995
+ },
+ {
+  "symbol": "2388.HK",
+  "name_cn": "中银香港",
+  "name_hk": "中銀香港",
+  "name_en": "BOC HONG KONG",
+  "lot_size": 500,
+  "currency": "HKD",
+  "total_shares": 10572780266
+ },
+ {
+  "symbol": "3328.HK",
+  "name_cn": "交通银行",
+  "name_hk": "交通銀行",
+  "name_en": "BANKCOMM",
+  "lot_size": 1000,
+  "currency": "HKD",
+  "total_shares": 88363784223
+ },
+ {
+  "symbol": "3968.HK",
+  "name_cn": "招商银行",
+  "name_hk": "招商銀行",
+  "name_en": "CM BANK",
+  "lot_size": 500,
+  "currency": "HKD",
+  "total_shares": 25219845601
+ },
+ {
+  "symbol": "3988.HK",
+  "name_cn": "中国银行",
+  "name_hk": "中國銀行",
+  "name_en": "BANK OF CHINA",
+  "lot_size": 1000,
+  "currency": "HKD",
+  "total_shares": 322212411814
+ }
+]

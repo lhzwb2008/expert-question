@@ -1,3 +1,0 @@
-item,value,unit,apply_when
-commission_per_share,0.005,USD/share,every fill, long or short, entry or exit or add
-slippage,0,USD,gap through a stop fills at the open; no extra slippage
