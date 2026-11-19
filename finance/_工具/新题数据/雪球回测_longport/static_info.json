@@ -1,0 +1,38 @@
+[
+ {
+  "symbol": "510500.SH",
+  "name_cn": "南方中证500ETF",
+  "name_hk": "南方中證500ETF",
+  "name_en": "China Southern CSI 500 ETF",
+  "lot_size": 100,
+  "currency": "CNY",
+  "total_shares": 5611368617
+ },
+ {
+  "symbol": "512100.SH",
+  "name_cn": "南方中证1000ETF",
+  "name_hk": "南方中證1000ETF",
+  "name_en": "China Southern CSI 1000 ETF",
+  "lot_size": 100,
+  "currency": "CNY",
+  "total_shares": 6951217646
+ },
+ {
+  "symbol": "000905.SH",
+  "name_cn": "中证500",
+  "name_hk": "中證500",
+  "name_en": "CSI 500",
+  "lot_size": 0,
+  "currency": "CNY",
+  "total_shares": 0
+ },
+ {
+  "symbol": "000852.SH",
+  "name_cn": "中证1000",
+  "name_hk": "中證1000",
+  "name_en": "中证1000",
+  "lot_size": 0,
+  "currency": "CNY",
+  "total_shares": 0
+ }
+]
