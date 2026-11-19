@@ -11,3 +11,6 @@ RSI-*.pdf
 
 # ALE 的 ZIP 由 prepare.py 重新打包
 ALE/**/*.zip
+
+# 填表时由 _工具/填写稿.py 从 ③填写稿.md 生成
+finance/_工具/表单文字/

@@ -164,6 +164,7 @@ Kiro 里这些工具是延迟加载的，先 `load_resource` 加载 `tool::chrom
 - 这一版页面是 React 16，fiber 挂在 `__reactInternalInstance$...` 上，不是 `__reactFiber`，两种都要认。`getFormValue` 在 `[data-field-id="fld9mOmdb6"]` 往上一层的 `memoizedProps` 上。
 - 「量化研究员」行的加号在视口 1440×633 时大约是 (532, 237)，点了弹出右侧表单，父记录自动是量化研究员（`reczz28YNimATcwQ`）。
 - `evaluate_script` 的 `sourcePath` 和 `take_snapshot` 的 `filePath` 只能读写 MCP 的工作区根目录，指到仓库或 `/tmp` 都被拒。要传大段文字或文件，起一个只监听 `127.0.0.1` 的 CORS 静态服务（根目录 `finance/`），页面里 `fetch`。表单文字放在 `_工具/表单文字/<题号>.json`，字段名 title、round、body、attach_note、cross、points、answer。
+- 每题的 `③填写稿.md` 是唯一的来源。填表前在 `_工具/` 下跑 `python3 填写稿.py export <题号>...`，生成 `表单文字/<题号>.json` 和 `manifest.json`（不入库），页面里从本地服务 fetch。改表单内容只改填写稿。
 - 附件：先真实点开字段的「添加附件」，弹出「添加本地文件」浮层以后，`fetch` 文件放进 `DataTransfer`，赋给 `input#attachment-upload` 再派发 `change`，几秒后 `getFormValue` 里就有文件名和大小。没用到 `upload_file`。
 - 下拉的「查找选项」框里 `Meta+A` 选不中文字，`type_text` 会接着往后打。清空要用原生 setter 改 `input.b-select-search` 的 value 再派发 `input` 事件。
 - 多选界面点一项，数据层就只剩界面上点过的几项（先前 `SetRecord` 写的数组被覆盖）。五个软件全部点一遍以后数组才是全的，最后一定再看一次 `getFormValue`。
