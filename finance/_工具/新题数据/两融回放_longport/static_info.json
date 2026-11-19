@@ -1,0 +1,110 @@
+[
+ {
+  "symbol": "601318.SH",
+  "name_cn": "中国平安",
+  "name_hk": "中國平安",
+  "name_en": "Ping An",
+  "lot_size": 100,
+  "currency": "CNY",
+  "total_shares": 18107641995
+ },
+ {
+  "symbol": "600030.SH",
+  "name_cn": "中信证券",
+  "name_hk": "中信證券",
+  "name_en": "CITIC Securities Co., Ltd.",
+  "lot_size": 100,
+  "currency": "CNY",
+  "total_shares": 15624272212
+ },
+ {
+  "symbol": "601899.SH",
+  "name_cn": "紫金矿业",
+  "name_hk": "紫金礦業",
+  "name_en": "Zijin Mining",
+  "lot_size": 100,
+  "currency": "CNY",
+  "total_shares": 26590798241
+ },
+ {
+  "symbol": "600309.SH",
+  "name_cn": "万华化学",
+  "name_hk": "萬華化學",
+  "name_en": "wanhua",
+  "lot_size": 100,
+  "currency": "CNY",
+  "total_shares": 3130471626
+ },
+ {
+  "symbol": "300750.SZ",
+  "name_cn": "宁德时代",
+  "name_hk": "寧德時代",
+  "name_en": "CATL",
+  "lot_size": 100,
+  "currency": "CNY",
+  "total_shares": 4627249686
+ },
+ {
+  "symbol": "002594.SZ",
+  "name_cn": "比亚迪",
+  "name_hk": "比亞迪",
+  "name_en": "BYD",
+  "lot_size": 100,
+  "currency": "CNY",
+  "total_shares": 9117197565
+ },
+ {
+  "symbol": "000333.SZ",
+  "name_cn": "美的集团",
+  "name_hk": "美的集團",
+  "name_en": "Midea Group",
+  "lot_size": 100,
+  "currency": "CNY",
+  "total_shares": 7630322484
+ },
+ {
+  "symbol": "300059.SZ",
+  "name_cn": "东方财富",
+  "name_hk": "東方財富",
+  "name_en": "EASTMONEY",
+  "lot_size": 100,
+  "currency": "CNY",
+  "total_shares": 15822199875
+ },
+ {
+  "symbol": "688981.SH",
+  "name_cn": "中芯国际",
+  "name_hk": "中芯國際",
+  "name_en": "SMIC",
+  "lot_size": 100,
+  "currency": "CNY",
+  "total_shares": 8562439270
+ },
+ {
+  "symbol": "601012.SH",
+  "name_cn": "隆基绿能",
+  "name_hk": "隆基綠能",
+  "name_en": "LONGi",
+  "lot_size": 100,
+  "currency": "CNY",
+  "total_shares": 7578069833
+ },
+ {
+  "symbol": "600276.SH",
+  "name_cn": "恒瑞医药",
+  "name_hk": "恆瑞醫藥",
+  "name_en": "Hengrui Pharma",
+  "lot_size": 100,
+  "currency": "CNY",
+  "total_shares": 6637199874
+ },
+ {
+  "symbol": "000858.SZ",
+  "name_cn": "五粮液",
+  "name_hk": "五糧液",
+  "name_en": "WLY",
+  "lot_size": 100,
+  "currency": "CNY",
+  "total_shares": 3881608005
+ }
+]

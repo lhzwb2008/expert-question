@@ -20,9 +20,12 @@ ENV = Path.home() / "workspace" / "Quantra" / ".env"
 PLAN = {
     "港股红利": dict(start=date(2025, 7, 1), end=date(2026, 10, 30)),
     "基准复算": dict(start=date(2023, 12, 1), end=date(2026, 10, 30), tickers=[
-        "AAPL.US", "MSFT.US", "NVDA.US", "GOOGL.US", "AMZN.US", "META.US", "AVGO.US", "TSLA.US", "NFLX.US", "ORCL.US",
-        "CRM.US", "AMD.US", "ADBE.US", "CSCO.US", "INTC.US", "QCOM.US", "NOW.US", "LRCX.US", "KLAC.US", "ANET.US",
-        "PLTR.US", "MU.US", "TXN.US", "IBM.US"]),
+        "AAPL.US", "MSFT.US", "CSCO.US", "TXN.US", "LRCX.US", "NFLX.US", "NOW.US", "KLAC.US"]),
+    "双重上市": dict(start=date(2026, 6, 1), end=date(2026, 10, 30), tickers=[
+        "BABA.US", "9988.HK", "JD.US", "9618.HK", "BIDU.US", "9888.HK", "NTES.US", "9999.HK", "TCOM.US", "9961.HK",
+        "BILI.US", "9626.HK", "ZTO.US", "2057.HK", "LI.US", "2015.HK", "EDU.US", "9901.HK", "YUMC.US", "9987.HK"]),
+    "两融回放": dict(start=date(2026, 6, 1), end=date(2026, 10, 30), tickers=[
+        "601318.SH", "600030.SH", "601899.SH", "300750.SZ", "000333.SZ", "688981.SH"]),
     "雪球回测": dict(start=date(2016, 11, 1), end=date(2026, 10, 30), tickers=["510500.SH", "512100.SH", "000905.SH", "000852.SH"]),
 }
 

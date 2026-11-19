@@ -1,0 +1,218 @@
+[
+ {
+  "symbol": "AAPL.US",
+  "name_cn": "苹果",
+  "name_hk": "蘋果",
+  "name_en": "Apple",
+  "lot_size": 1,
+  "currency": "USD",
+  "total_shares": 14532182000
+ },
+ {
+  "symbol": "MSFT.US",
+  "name_cn": "微软",
+  "name_hk": "微軟",
+  "name_en": "Microsoft",
+  "lot_size": 1,
+  "currency": "USD",
+  "total_shares": 7426194552
+ },
+ {
+  "symbol": "NVDA.US",
+  "name_cn": "英伟达",
+  "name_hk": "英偉達",
+  "name_en": "NVIDIA",
+  "lot_size": 1,
+  "currency": "USD",
+  "total_shares": 24100000000
+ },
+ {
+  "symbol": "GOOGL.US",
+  "name_cn": "谷歌-A",
+  "name_hk": "谷歌-A",
+  "name_en": "Alphabet",
+  "lot_size": 1,
+  "currency": "USD",
+  "total_shares": 12294000000
+ },
+ {
+  "symbol": "AMZN.US",
+  "name_cn": "亚马逊",
+  "name_hk": "亞馬遜",
+  "name_en": "Amazon",
+  "lot_size": 1,
+  "currency": "USD",
+  "total_shares": 10813138306
+ },
+ {
+  "symbol": "META.US",
+  "name_cn": "Meta",
+  "name_hk": "Meta",
+  "name_en": "Meta Platforms",
+  "lot_size": 1,
+  "currency": "USD",
+  "total_shares": 2556241253
+ },
+ {
+  "symbol": "AVGO.US",
+  "name_cn": "博通",
+  "name_hk": "博通",
+  "name_en": "Broadcom",
+  "lot_size": 1,
+  "currency": "USD",
+  "total_shares": 4773629865
+ },
+ {
+  "symbol": "TSLA.US",
+  "name_cn": "特斯拉",
+  "name_hk": "特斯拉",
+  "name_en": "Tesla",
+  "lot_size": 1,
+  "currency": "USD",
+  "total_shares": 3949547394
+ },
+ {
+  "symbol": "NFLX.US",
+  "name_cn": "奈飞",
+  "name_hk": "奈飛",
+  "name_en": "Netflix",
+  "lot_size": 1,
+  "currency": "USD",
+  "total_shares": 4163939676
+ },
+ {
+  "symbol": "ORCL.US",
+  "name_cn": "甲骨文",
+  "name_hk": "甲骨文",
+  "name_en": "Oracle",
+  "lot_size": 1,
+  "currency": "USD",
+  "total_shares": 3117708046
+ },
+ {
+  "symbol": "CRM.US",
+  "name_cn": "赛富时",
+  "name_hk": "賽富時",
+  "name_en": "Salesforce",
+  "lot_size": 1,
+  "currency": "USD",
+  "total_shares": 823000000
+ },
+ {
+  "symbol": "AMD.US",
+  "name_cn": "AMD",
+  "name_hk": "AMD",
+  "name_en": "AMD",
+  "lot_size": 1,
+  "currency": "USD",
+  "total_shares": 1640087251
+ },
+ {
+  "symbol": "ADBE.US",
+  "name_cn": "Adobe",
+  "name_hk": "Adobe",
+  "name_en": "Adobe",
+  "lot_size": 1,
+  "currency": "USD",
+  "total_shares": 397500000
+ },
+ {
+  "symbol": "CSCO.US",
+  "name_cn": "思科",
+  "name_hk": "思科",
+  "name_en": "Cisco",
+  "lot_size": 1,
+  "currency": "USD",
+  "total_shares": 3936980098
+ },
+ {
+  "symbol": "INTC.US",
+  "name_cn": "英特尔",
+  "name_hk": "英特爾",
+  "name_en": "Intel",
+  "lot_size": 1,
+  "currency": "USD",
+  "total_shares": 5254526315
+ },
+ {
+  "symbol": "QCOM.US",
+  "name_cn": "高通",
+  "name_hk": "高通",
+  "name_en": "Qualcomm",
+  "lot_size": 1,
+  "currency": "USD",
+  "total_shares": 1067000000
+ },
+ {
+  "symbol": "NOW.US",
+  "name_cn": "现在服务",
+  "name_hk": "現在服務",
+  "name_en": "ServiceNow",
+  "lot_size": 1,
+  "currency": "USD",
+  "total_shares": 1033862000
+ },
+ {
+  "symbol": "LRCX.US",
+  "name_cn": "泛林集团",
+  "name_hk": "泛林集團",
+  "name_en": "Lam Research",
+  "lot_size": 1,
+  "currency": "USD",
+  "total_shares": 1249171000
+ },
+ {
+  "symbol": "KLAC.US",
+  "name_cn": "科磊",
+  "name_hk": "科磊",
+  "name_en": "KLA",
+  "lot_size": 1,
+  "currency": "USD",
+  "total_shares": 1306275210
+ },
+ {
+  "symbol": "ANET.US",
+  "name_cn": "Arista Networks",
+  "name_hk": "Arista Networks",
+  "name_en": "Arista Networks",
+  "lot_size": 1,
+  "currency": "USD",
+  "total_shares": 1263402335
+ },
+ {
+  "symbol": "PLTR.US",
+  "name_cn": "Palantir Tech",
+  "name_hk": "Palantir Tech",
+  "name_en": "Palantir Tech",
+  "lot_size": 1,
+  "currency": "USD",
+  "total_shares": 2409497474
+ },
+ {
+  "symbol": "MU.US",
+  "name_cn": "美光科技",
+  "name_hk": "美光科技",
+  "name_en": "Micron Tech",
+  "lot_size": 1,
+  "currency": "USD",
+  "total_shares": 1131423212
+ },
+ {
+  "symbol": "TXN.US",
+  "name_cn": "德州仪器",
+  "name_hk": "德州儀器",
+  "name_en": "Texas Instruments",
+  "lot_size": 1,
+  "currency": "USD",
+  "total_shares": 913770316
+ },
+ {
+  "symbol": "IBM.US",
+  "name_cn": "IBM",
+  "name_hk": "IBM",
+  "name_en": "IBM",
+  "lot_size": 1,
+  "currency": "USD",
+  "total_shares": 945120805
+ }
+]

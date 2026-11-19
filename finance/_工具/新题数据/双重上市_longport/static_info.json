@@ -1,0 +1,290 @@
+[
+ {
+  "symbol": "BABA.US",
+  "name_cn": "阿里巴巴",
+  "name_hk": "阿里巴巴",
+  "name_en": "Alibaba",
+  "lot_size": 1,
+  "currency": "USD",
+  "total_shares": 2487744939
+ },
+ {
+  "symbol": "9988.HK",
+  "name_cn": "阿里巴巴-W",
+  "name_hk": "阿里巴巴-W",
+  "name_en": "BABA-W",
+  "lot_size": 100,
+  "currency": "HKD",
+  "total_shares": 19901959514
+ },
+ {
+  "symbol": "JD.US",
+  "name_cn": "京东",
+  "name_hk": "京東",
+  "name_en": "JD.com",
+  "lot_size": 1,
+  "currency": "USD",
+  "total_shares": 1344000000
+ },
+ {
+  "symbol": "9618.HK",
+  "name_cn": "京东-SW",
+  "name_hk": "京東-SW",
+  "name_en": "JD-SW",
+  "lot_size": 50,
+  "currency": "HKD",
+  "total_shares": 2688000000
+ },
+ {
+  "symbol": "BIDU.US",
+  "name_cn": "百度",
+  "name_hk": "百度",
+  "name_en": "Baidu",
+  "lot_size": 1,
+  "currency": "USD",
+  "total_shares": 330165967
+ },
+ {
+  "symbol": "9888.HK",
+  "name_cn": "百度集团-W",
+  "name_hk": "百度集團-W",
+  "name_en": "BIDU-W",
+  "lot_size": 50,
+  "currency": "HKD",
+  "total_shares": 2735594050
+ },
+ {
+  "symbol": "NTES.US",
+  "name_cn": "网易",
+  "name_hk": "網易",
+  "name_en": "NetEase",
+  "lot_size": 1,
+  "currency": "USD",
+  "total_shares": 633198284
+ },
+ {
+  "symbol": "9999.HK",
+  "name_cn": "网易",
+  "name_hk": "網易",
+  "name_en": "NTES",
+  "lot_size": 100,
+  "currency": "HKD",
+  "total_shares": 3201470116
+ },
+ {
+  "symbol": "TCOM.US",
+  "name_cn": "携程网",
+  "name_hk": "攜程網",
+  "name_en": "Trip.com",
+  "lot_size": 1,
+  "currency": "USD",
+  "total_shares": 652238214
+ },
+ {
+  "symbol": "9961.HK",
+  "name_cn": "携程集团-S",
+  "name_hk": "攜程集團-S",
+  "name_en": "TRIP.COM-S",
+  "lot_size": 50,
+  "currency": "HKD",
+  "total_shares": 629705222
+ },
+ {
+  "symbol": "BILI.US",
+  "name_cn": "哔哩哔哩",
+  "name_hk": "嗶哩嗶哩",
+  "name_en": "Bilibili",
+  "lot_size": 1,
+  "currency": "USD",
+  "total_shares": 409996063
+ },
+ {
+  "symbol": "9626.HK",
+  "name_cn": "哔哩哔哩-W",
+  "name_hk": "嗶哩嗶哩-W",
+  "name_en": "BILIBILI-W",
+  "lot_size": 20,
+  "currency": "HKD",
+  "total_shares": 399751168
+ },
+ {
+  "symbol": "ZTO.US",
+  "name_cn": "中通快递",
+  "name_hk": "中通快遞",
+  "name_en": "ZTO Express",
+  "lot_size": 1,
+  "currency": "USD",
+  "total_shares": 763430906
+ },
+ {
+  "symbol": "2057.HK",
+  "name_cn": "中通快递-W",
+  "name_hk": "中通快遞-W",
+  "name_en": "ZTO EXPRESS-W",
+  "lot_size": 50,
+  "currency": "HKD",
+  "total_shares": 753852009
+ },
+ {
+  "symbol": "NIO.US",
+  "name_cn": "蔚来",
+  "name_hk": "蔚來",
+  "name_en": "NIO Inc",
+  "lot_size": 1,
+  "currency": "USD",
+  "total_shares": 2505667022
+ },
+ {
+  "symbol": "9866.HK",
+  "name_cn": "蔚来-SW",
+  "name_hk": "蔚來-SW",
+  "name_en": "NIO-SW",
+  "lot_size": 10,
+  "currency": "HKD",
+  "total_shares": 2509871468
+ },
+ {
+  "symbol": "XPEV.US",
+  "name_cn": "小鹏汽车",
+  "name_hk": "小鵬汽車",
+  "name_en": "XPeng",
+  "lot_size": 1,
+  "currency": "USD",
+  "total_shares": 955826433
+ },
+ {
+  "symbol": "9868.HK",
+  "name_cn": "小鹏集团-W",
+  "name_hk": "小鵬集團-W",
+  "name_en": "XPENG-W",
+  "lot_size": 100,
+  "currency": "HKD",
+  "total_shares": 1918852295
+ },
+ {
+  "symbol": "LI.US",
+  "name_cn": "理想汽车",
+  "name_hk": "理想汽車",
+  "name_en": "Li Auto",
+  "lot_size": 1,
+  "currency": "USD",
+  "total_shares": 1030614658
+ },
+ {
+  "symbol": "2015.HK",
+  "name_cn": "理想汽车-W",
+  "name_hk": "理想汽車-W",
+  "name_en": "LI AUTO-W",
+  "lot_size": 100,
+  "currency": "HKD",
+  "total_shares": 1936200474
+ },
+ {
+  "symbol": "BEKE.US",
+  "name_cn": "贝壳",
+  "name_hk": "貝殼",
+  "name_en": "KE",
+  "lot_size": 1,
+  "currency": "USD",
+  "total_shares": 1168741931
+ },
+ {
+  "symbol": "2423.HK",
+  "name_cn": "贝壳-W",
+  "name_hk": "貝殼-W",
+  "name_en": "BEKE-W",
+  "lot_size": 100,
+  "currency": "HKD",
+  "total_shares": 3301148553
+ },
+ {
+  "symbol": "HTHT.US",
+  "name_cn": "华住酒店",
+  "name_hk": "華住酒店",
+  "name_en": "H World",
+  "lot_size": 1,
+  "currency": "USD",
+  "total_shares": 307152569
+ },
+ {
+  "symbol": "1179.HK",
+  "name_cn": "华住集团-S",
+  "name_hk": "華住集團-S",
+  "name_en": "HWORLD-S",
+  "lot_size": 100,
+  "currency": "HKD",
+  "total_shares": 3154059870
+ },
+ {
+  "symbol": "TME.US",
+  "name_cn": "腾讯音乐",
+  "name_hk": "騰訊音樂",
+  "name_en": "Tencent Music",
+  "lot_size": 1,
+  "currency": "USD",
+  "total_shares": 1548904504
+ },
+ {
+  "symbol": "1698.HK",
+  "name_cn": "腾讯音乐-SW",
+  "name_hk": "騰訊音樂-SW",
+  "name_en": "TME-SW",
+  "lot_size": 100,
+  "currency": "HKD",
+  "total_shares": 3301604303
+ },
+ {
+  "symbol": "EDU.US",
+  "name_cn": "新东方",
+  "name_hk": "新東方",
+  "name_en": "New Oriental EDU & Tech",
+  "lot_size": 1,
+  "currency": "USD",
+  "total_shares": 155029580
+ },
+ {
+  "symbol": "9901.HK",
+  "name_cn": "新东方-S",
+  "name_hk": "新東方-S",
+  "name_en": "NEW ORIENTAL-S",
+  "lot_size": 100,
+  "currency": "HKD",
+  "total_shares": 1550295803
+ },
+ {
+  "symbol": "YUMC.US",
+  "name_cn": "百胜中国",
+  "name_hk": "百勝中國",
+  "name_en": "YUM China",
+  "lot_size": 1,
+  "currency": "USD",
+  "total_shares": 342458136
+ },
+ {
+  "symbol": "9987.HK",
+  "name_cn": "百胜中国",
+  "name_hk": "百勝中國",
+  "name_en": "YUM CHINA",
+  "lot_size": 50,
+  "currency": "HKD",
+  "total_shares": 336998443
+ },
+ {
+  "symbol": "MNSO.US",
+  "name_cn": "名创优品",
+  "name_hk": "名創優品",
+  "name_en": "Miniso",
+  "lot_size": 1,
+  "currency": "USD",
+  "total_shares": 309391044
+ },
+ {
+  "symbol": "9896.HK",
+  "name_cn": "名创优品",
+  "name_hk": "名創優品",
+  "name_en": "MNSO",
+  "lot_size": 200,
+  "currency": "HKD",
+  "total_shares": 1175523621
+ }
+]

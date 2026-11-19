@@ -1,0 +1,22 @@
+{
+  "mcpServers": {
+    "us-stocks": {
+      "url": "https://mcp-stocks-us.gino.im/mcp",
+      "disabled": false,
+      "autoApprove": []
+    },
+    "chrome-devtools": {
+      "command": "/Users/wenbozhang/.local/opt/node/bin/node",
+      "args": [
+        "/Users/wenbozhang/.local/opt/node/lib/node_modules/chrome-devtools-mcp/out/Default/gen/src/bin/chrome-devtools-mcp.js",
+        "--experimentalVision",
+        "--viewport", "1440x900",
+        "--screenshotFormat", "jpeg",
+        "--screenshotMaxWidth", "1440"
+      ],
+      "env": { "PATH": "/Users/wenbozhang/.local/opt/node/bin:/usr/bin:/bin:/usr/sbin:/sbin" },
+      "disabled": false,
+      "autoApprove": []
+    }
+  }
+}

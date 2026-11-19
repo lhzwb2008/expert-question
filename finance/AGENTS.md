@@ -1,8 +1,8 @@
 # finance 收题表：给 agent 的工作说明
 
-这份是 `finance/` 的总说明，写给在 Cursor 里继续往「金融」收题表填题的 agent。用户用中文交流。题目材料在 `finance/题目/`，填写稿是每个文件夹里的 `③填写稿.md`。
+这份是 `finance/` 的总说明，写给继续往「金融」收题表填题的 agent，Cursor 和 Kiro 都适用。用户用中文交流。题目材料在 `finance/题目/`，填写稿是每个文件夹里的 `③填写稿.md`。
 
-2026-11-18 用 Cursor 内置浏览器把第 13 题填进了表单，文字、选项和附件都进了表单数据。这一页记的是那次跑通的填法。
+2026-11-18 用 Cursor 内置浏览器把第 13 题填进了表单，文字、选项和附件都进了表单数据。这一页记的是那次跑通的填法。表单内部的写法（`setEditorValue`、`SetRecord`、`getFormValue`）和用哪个 IDE 无关；只有「怎么开浏览器、怎么点、怎么传文件」两边工具不同，Kiro 的做法见下面「在 Kiro 里填」。
 
 ## 用户的固定要求
 
@@ -15,7 +15,7 @@
 
 收题表：`https://bytedance.larkoffice.com/base/ABZUbyldlapLbds74fecw3jxngh`
 
-用 Cursor 内置浏览器打开，账号是已经登录的飞书（张文铂）。不要另开账号。
+Cursor 用内置浏览器打开；Kiro 用 `chrome-devtools` MCP 打开（见「在 Kiro 里填」）。账号是飞书（张文铂）。不要另开账号。
 
 进入视图「③岗位下出题｜点岗位旁＋」。表 id `tbl94OOLIrmWsjdI`，这个视图 id `vewgXaX1uy`。
 
@@ -120,6 +120,55 @@ await executeAction(() => ({
 3. 页面里 `fetch` 这些文件，放进 `DataTransfer`，赋给 `input#attachment-upload` 的 `files`，再派发 `change`。上传完成后这个 input 会被清空，这是正常的。
 4. 题目附件和标准答案附件分开传。传完看 `getFormValue()` 里的文件名和大小。
 5. 重复文件用同一种 `SetRecord` 收掉，附件字段 `type` 是 17，`value` 是保留下来的附件对象数组。这个值有时直接就是数组，有时是 `{value: 数组}`。
+
+## 在 Kiro 里填
+
+Kiro IDE 没有内置浏览器，用 Chrome DevTools MCP 驱动本机 Chrome。2026-11-19 装好并验证过。
+
+### 装了什么
+
+- Node.js v22 LTS，解压在 `~/.local/opt/node`（软链到具体版本目录），没有改系统 PATH。
+- `chrome-devtools-mcp` 1.13.0，用这个 Node 的 `npm install -g` 装在 `~/.local/opt/node/lib/node_modules/`。
+- 配置在仓库根目录 `.kiro/settings/mcp.json`，服务名 `chrome-devtools`，用绝对路径启动 node，带 `--experimentalVision`（开 `click_at` 坐标点击）和 `--viewport 1440x900`。同一个文件里也配了 `us-stocks`，和 `.cursor/mcp.json` 是同一个服务。
+- 改了 `mcp.json` 保存即生效，不用重启 Kiro。连不上看 Kiro 面板的 MCP 页，或 Output →「Kiro - MCP Logs」。
+
+重装：
+
+```bash
+export PATH=~/.local/opt/node/bin:$PATH
+npm install -g chrome-devtools-mcp@latest
+```
+
+### 登录
+
+MCP 启动的 Chrome 用的是独立的用户目录 `~/.cache/chrome-devtools-mcp/chrome-profile`，不是日常 Chrome 的登录态。第一次打开收题表会跳飞书登录页，让用户在弹出的 Chrome 窗口里扫码登录张文铂的账号，agent 不碰账号密码。登录一次以后这个目录会记住。
+
+### 工具对照
+
+Kiro 里这些工具是延迟加载的，先 `load_resource` 加载 `tool::chrome-devtools::<名字>`，再用 `tool_call` 调。
+
+| Cursor 内置浏览器 | Kiro（chrome-devtools MCP） | 说明 |
+| --- | --- | --- |
+| 打开页面 | `new_page` / `navigate_page` | |
+| `browser_take_screenshot` | `take_screenshot` | 截图是 CSS 像素，不用乘 0.619 |
+| 无障碍树 | `take_snapshot` | 返回的 uid 给 `click`、`fill` 用 |
+| `browser_mouse_click_xy` | `click_at` | 点 canvas 上「量化研究员」行的加号，坐标直接用截图上的 |
+| 页面里跑脚本 | `evaluate_script` | `setEditorValue`、`SetRecord`、`getFormValue` 都在这里跑，函数可以是 async |
+| `browser_lock` / `unlock` | 无 | 填的时候告诉用户先别动那个 Chrome 窗口 |
+| 本地 HTTP 服务喂文件 | `upload_file` | 先真实点开字段的「添加附件」，再对 `input#attachment-upload` 的 uid 传本地绝对路径；不行再退回本地 HTTP 服务的办法 |
+
+其余步骤（父记录核对、记录类型用 `SetRecord` 改成题目、文字写法、选项点选、核对清单）和上面完全一样。
+
+### 2026-11-19 填第 22 题时实际跑通的细节
+
+- 这一版页面是 React 16，fiber 挂在 `__reactInternalInstance$...` 上，不是 `__reactFiber`，两种都要认。`getFormValue` 在 `[data-field-id="fld9mOmdb6"]` 往上一层的 `memoizedProps` 上。
+- 「量化研究员」行的加号在视口 1440×633 时大约是 (532, 237)，点了弹出右侧表单，父记录自动是量化研究员（`reczz28YNimATcwQ`）。
+- `evaluate_script` 的 `sourcePath` 和 `take_snapshot` 的 `filePath` 只能读写 MCP 的工作区根目录，指到仓库或 `/tmp` 都被拒。要传大段文字或文件，起一个只监听 `127.0.0.1` 的 CORS 静态服务（根目录 `finance/`），页面里 `fetch`。表单文字放在 `_工具/表单文字/<题号>.json`，字段名 title、round、body、attach_note、cross、points、answer。
+- 附件：先真实点开字段的「添加附件」，弹出「添加本地文件」浮层以后，`fetch` 文件放进 `DataTransfer`，赋给 `input#attachment-upload` 再派发 `change`，几秒后 `getFormValue` 里就有文件名和大小。没用到 `upload_file`。
+- 下拉的「查找选项」框里 `Meta+A` 选不中文字，`type_text` 会接着往后打。清空要用原生 setter 改 `input.b-select-search` 的 value 再派发 `input` 事件。
+- 多选界面点一项，数据层就只剩界面上点过的几项（先前 `SetRecord` 写的数组被覆盖）。五个软件全部点一遍以后数组才是全的，最后一定再看一次 `getFormValue`。
+- 选完以后选项浮层不会自己关，点表单左侧空白处（如 (880, 520)）关掉。`Escape` 关不掉。
+- 表单没点「提交」之前数据只在这个弹窗里。关掉弹窗、刷新页面都会丢，给用户看的时候不要动它。
 
 ## 不要做的事
 
