@@ -235,7 +235,7 @@ def q24():
     for x in ok["det"]:
         y = next(z for z in divs if (z[0], z[1]) == (x["t"], x["ex"]))
         got = r2(x["gross"] - x["bad_tax"]) if x["pay"] <= BASE else ""
-        dv_rows.append([x["t"], x["ex"], x["sh"], y[2], x["per"], x["gross"], x["tax"], x["net"], x["pay"], got,
+        dv_rows.append([x["t"], x["ex"], x["sh"], y[2], x["per"], x["gross"], x["tax"], x["net"], x["pay"] if x["pay"] <= BASE else "未到账", got,
                         r2(x["bad_tax"] - x["tax"]) if x["pay"] <= BASE else "", "是" if x["pay"] <= BASE else "否（应收）"])
     rec_ok, rec_sys = r2(sum(ok["rec"].values())), r2(sum(sys_["rec"].values()))
     n_rows = [["股票市值", mv(ok["pos"]), mv(sys_["pos"]), mv(ok["pos"])],
@@ -278,7 +278,7 @@ def q24():
             "两处持仓错误方向相反，净效果是多估。只看到其中一处，差错率会算错，处理级别也可能判错。"]),
         ("托管行的问题", [f"CSCO 2026-01-02、04-02、07-06、10-02 四次分红按 30% 扣税，按税收协定应扣 10%，合计多扣 {w2(ok['refund'])} 美元。"
                       "托管行要补记应收退税，并办理退税申请。"]),
-        ("应收股利", [f"TXN 2026-10-30 除息、11-10 付息，税后 {w2(rec_ok)} 美元，10-30 记应收股利。2025-10-31 除息的那笔期初已经记过，11-11 到账，不能重复算。"]),
+        ("应收股利", [f"TXN 2026-10-30 除息，10-30 还没到账，税后 {w2(rec_ok)} 美元记应收股利。2025-10-31 除息的那笔期初已经记过，11-11 到账，不能重复算。"]),
         ("数据", ["行情用内部快照的不复权收盘价。拆股、分红通过 US Stocks MCP 的 get_historical_stock_prices 查询 8 只股票近两年的数据，"
                 "取 Stock Splits 和 Dividends 两列；拆股前的分红金额按拆股比例还原后和托管行入账一致。"]),
     ])
