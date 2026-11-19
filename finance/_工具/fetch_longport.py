@@ -26,6 +26,8 @@ PLAN = {
         "BILI.US", "9626.HK", "ZTO.US", "2057.HK", "LI.US", "2015.HK", "EDU.US", "9901.HK", "YUMC.US", "9987.HK"]),
     "两融回放": dict(start=date(2026, 6, 1), end=date(2026, 10, 30), tickers=[
         "601318.SH", "600030.SH", "601899.SH", "300750.SZ", "000333.SZ", "688981.SH"]),
+    "定增减持": dict(start=date(2026, 8, 1), end=date(2026, 11, 18), tickers=[
+        "002371.SZ", "688012.SH", "603986.SH", "002049.SZ", "600584.SH"]),
     "雪球回测": dict(start=date(2016, 11, 1), end=date(2026, 10, 30), tickers=["510500.SH", "512100.SH", "000905.SH", "000852.SH"]),
 }
 

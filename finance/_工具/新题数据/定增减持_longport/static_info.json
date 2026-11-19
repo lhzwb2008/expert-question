@@ -1,0 +1,47 @@
+[
+ {
+  "symbol": "002371.SZ",
+  "name_cn": "北方华创",
+  "name_hk": "北方華創",
+  "name_en": "NAURA",
+  "lot_size": 100,
+  "currency": "CNY",
+  "total_shares": 727953799
+ },
+ {
+  "symbol": "688012.SH",
+  "name_cn": "中微公司",
+  "name_hk": "中微公司",
+  "name_en": "AMEC",
+  "lot_size": 100,
+  "currency": "CNY",
+  "total_shares": 957842348
+ },
+ {
+  "symbol": "603986.SH",
+  "name_cn": "兆易创新",
+  "name_hk": "兆易創新",
+  "name_en": "GIGADEVICE",
+  "lot_size": 100,
+  "currency": "CNY",
+  "total_shares": 703971427
+ },
+ {
+  "symbol": "002049.SZ",
+  "name_cn": "紫光国微",
+  "name_hk": "紫光國微",
+  "name_en": "GUOXIN MICRO",
+  "lot_size": 100,
+  "currency": "CNY",
+  "total_shares": 843233778
+ },
+ {
+  "symbol": "600584.SH",
+  "name_cn": "长电科技",
+  "name_hk": "長電科技",
+  "name_en": "JCET",
+  "lot_size": 100,
+  "currency": "CNY",
+  "total_shares": 1789414570
+ }
+]
