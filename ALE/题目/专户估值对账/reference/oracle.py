@@ -542,7 +542,7 @@ def build_memo(res: dict, path: Path) -> None:
 
 
 def tidy_ooxml(path: Path, title: str) -> None:
-    """统一文档属性：写入标题和本次生成时间，清掉生成库留下的默认属性和模板缩略图。"""
+    """写入文档属性（标题、生成时间），不附带模板缩略图。"""
     now = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     core = ('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
             '<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" '
@@ -578,7 +578,7 @@ def tidy_ooxml(path: Path, title: str) -> None:
 
 
 def shared_strings(items: list) -> list:
-    """把工作表里的内联字符串改存到共享字符串表，并去掉取默认值的冗余属性。"""
+    """工作表字符串改用共享字符串表存放。"""
     table: list[bytes] = []
     index: dict[bytes, int] = {}
     refs = [0]
