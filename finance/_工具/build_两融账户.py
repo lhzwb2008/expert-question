@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""打包「量化多头二号」两融账户的两道题（26 10月回放复核 → 27 11月降杠杆执行方案）。
-27 读 26 的标准答案《两融账户10月回放复核表.xlsx》「10月末状态」，这份表原样复制进 27 的题目附件。
-沪深行情快照是 fetch_longport.py 拉的不复权日线；中芯国际 10 月日线和 6 只股票 11-02 收盘价是 fetch_新题.py 通过 US Stocks MCP 查的。
-持仓、融资合约、交易流水、券商通知和投资经理邮件是按题目需要拟的。
+"""打包「量化多头二号」两融账户的两道题（26 10月回放复核 → 27 11月降杠杆卖出方案）。
+27 只用 26 标准答案《两融账户10月回放复核表.xlsx》「10月末状态」里的持股数和板块，这份表原样复制进 27 的题目附件。
+27 的负债直接给券商 11-02 日终对账单，不再按合同计息和还款；核心是压力跌幅、压力情景比例、集中度和单只卖出上限下的卖出顺序。
+沪深行情快照是 fetch_longport.py 拉的不复权日线；中芯国际 10 月日线和 6 只股票近 3 个月日线是 fetch_新题.py 通过 US Stocks MCP 查的。
+持仓、融资合约、交易流水、券商通知、投资经理邮件、降杠杆目标和顺序是按题目需要拟的。
 """
 from __future__ import annotations
 
@@ -325,7 +326,7 @@ def q26():
                                "卖券还款先还截至前一自然日的应付利息，再按开仓日先后还本金。"],
                       "强平核对": ["合同第八条：强制平仓先用现金直接还款，还款后仍低于 150% 的才卖券，以恢复到 150% 为限。按 A07，用强平当日 10-26 收盘价回算。",
                                f"超额平仓损失按 A07：超额股数 × (10-30 收盘价 − 强平成交价)，再加上超额部分分摊的交易费用。"],
-                      "10月末状态": [f"10 月涨跌幅 = 2026-10-30 收盘价 ÷ 2026-09-30 收盘价 − 1。下一步降杠杆按这张表执行。"],
+                      "10月末状态": ["10 月涨跌幅 = 2026-10-30 收盘价 ÷ 2026-09-30 收盘价 − 1。"],
                       "在线数据": [source_line(rec), f"返回 {len(m)} 行，Date 为 {str(m.Date.iloc[0])[:10]} 至 {str(m.Date.iloc[-1])[:10]}（UTC），对应交易日 {m.index[0]} 至 {m.index[-1]}。Date 是 UTC 16:00，加 8 小时后的日期是交易日。",
                                "Close 是按分红调整的价格，这段时间 Dividends 全是 0，和不复权价相同，只有浮点尾数，保留两位小数使用。"]})
     warn_days = [d for d in days if r(d) < WARN]
@@ -344,7 +345,7 @@ def q26():
                        "能主张的是超额平仓：合同第八条要求先用现金还款，券商跳过了这一步。",
                        "另外，22 日转入的 250 万元如果当天直接还款，而不是留在账户里当担保物，比例会更高。以后追保优先直接还款。"]),
         ("10 月末状态", [f"担保证券市值 {w2(tot_mv)} 元，现金 {w2(acc.cash)} 元，融资本金 {w2(acc.principal)} 元，应付利息 {w2(acc.intr)} 元，维持担保比例 {pc(rat_e)}。",
-                       "持仓：" + "，".join(f"{NAME[k]} {acc.pos[k]:,} 股" for k in NAME) + "。下一步降杠杆按复核表「10月末状态」执行。"]),
+                       "持仓：" + "，".join(f"{NAME[k]} {acc.pos[k]:,} 股" for k in NAME) + "。"]),
         ("数据", ["沪深五只股票用内部行情快照。中芯国际通过 US Stocks MCP 查询 688981.SS，这段时间没有分红，Close 和不复权价相同，保留两位小数使用；Date 加 8 小时取交易日。"]),
     ])
     print(f"[26] 比例 " + " ".join(f"{d[5:]}:{r(d) * 100:.2f}" for d in ["2026-09-30"] + days))
@@ -354,160 +355,203 @@ def q26():
 
 
 # ---------------- 27 ----------------
+STRESS, CAP, FEE27 = 1.80, 0.50, 0.00076
+LIMIT = {"沪市主板": 0.10, "深市主板": 0.10, "创业板": 0.20, "科创板": 0.20}
+
+
 def read_q26(path: Path):
     wb = load_workbook(path, data_only=True)
-    pos, chg, con, intr, cash = {}, {}, [], None, None
+    pos, board = {}, {}
     for r in wb["10月末状态"].iter_rows(min_row=2, values_only=True):
-        if not r or not r[0]:
-            continue
-        if r[0] == "担保证券":
+        if r and r[0] == "担保证券":
             pos[str(r[1])] = int(r[4])
-            chg[str(r[1])] = float(r[7])
-        elif r[0] == "融资合约":
-            con.append([r[1], r[9].replace("开仓日 ", ""), float(r[6])])
-        elif r[0] == "应付融资利息":
-            intr = float(r[6])
-        elif r[0] == "现金余额":
-            cash = float(r[6])
-    return pos, chg, con, intr, cash
+            board[str(r[1])] = r[3]
+    return pos, board
 
 
-def lots(code: str, held: int):
-    """返回从小到大可以申报的卖出股数。"""
+def lots(code: str, room: int):
+    """不超过 room 股时，从小到大可以申报的卖出股数。"""
     if code.startswith("688"):
-        if held < 200:
-            return [held]
-        return list(range(200, held + 1))
-    if held < 100:
-        return [held]
-    qs = list(range(100, held - held % 100 + 1, 100))
-    if held % 100:
-        qs.append(held)
-    return qs
+        return list(range(200, room + 1)) if room >= 200 else []
+    return list(range(100, room - room % 100 + 1, 100))
 
 
 def q27(r26):
-    import copy
     att, ans = fresh_dir(D27 / "题目附件"), fresh_dir(D27 / "标准答案附件")
-    (D27 / "MCP结果文件").mkdir(exist_ok=True)
+    fresh_dir(D27 / "MCP结果文件")
     copy_as(D26 / "标准答案附件" / "两融账户10月回放复核表.xlsx", att / "两融账户10月回放复核表.xlsx")
     copy_as(DOC / "两融降杠杆" / "A01_投委会降杠杆决议.md", att / "降杠杆_A01_投委会降杠杆决议.md")
-    copy_as(DOC / "两融回放" / "A04_融资融券合同条款摘要.md", att / "降杠杆_A02_融资融券合同条款摘要.md")
     mcps = {}
     for k in NAME:
         fn = f"降杠杆_MCP_{NAME[k]}日线.json"
-        copy_as(RAW / "两融降杠杆" / f"{YSYM[k]}.json", D27 / "MCP结果文件" / fn)
+        copy_as(RAW / "两融降杠杆压力" / f"{YSYM[k]}.json", D27 / "MCP结果文件" / fn)
         copy_as(D27 / "MCP结果文件" / fn, att / fn)
         mcps[k] = fn
-    pos, chg, con, intr, cash = read_q26(att / "两融账户10月回放复核表.xlsx")
-    recs, p = {}, {}
+
+    # 券商 11-02 日终对账单：10-31、11-01 按 10-30 本金计息；11-02 现金直接还款（先息后本），当天利息按还款后本金计
+    acc = r26["acc"]
+    a = Account(acc.pos, acc.cash, acc.con, acc.intr)
+    a.accrue(2)
+    cash = a.cash
+    pay_i, parts, rest = a.repay(cash)
+    assert rest == 0
+    a.cash = 0.0
+    a.intr = r2(a.intr + r2(a.principal * RATE / 360))
+    with open(att / "降杠杆_A02_华东证券11月2日对账单.csv", "w", newline="", encoding="utf-8") as f:
+        wr = csv.writer(f)
+        wr.writerow(["项目", "合约编号", "开仓日", "2026-11-02日终金额(元)", "说明"])
+        for c in a.con:
+            wr.writerow(["融资合约", c[0], c[1], f"{c[2]:.2f}", "未还本金"])
+        wr.writerow(["应付融资利息", "", "", f"{a.intr:.2f}", "11-02 当天按还款后本金计提"])
+        wr.writerow(["现金余额", "", "", "0.00", ""])
+        wr.writerow(["直接还款", "", "", f"{cash:.2f}", f"11-02 客户发起，先还应付利息 {pay_i:.2f}，再还 " + "，".join(f"{x} 本金 {y:.2f}" for x, y in parts)])
+
+    # ---- 只用附件重算 ----
+    pos0, board = read_q26(att / "两融账户10月回放复核表.xlsx")
+    st = pd.read_csv(att / "降杠杆_A02_华东证券11月2日对账单.csv", dtype=str)
+    debt0 = r2(sum(float(x) for x in st[st["项目"].isin(["融资合约", "应付融资利息"])]["2026-11-02日终金额(元)"]))
+    cash0 = float(st[st["项目"] == "现金余额"]["2026-11-02日终金额(元)"].iloc[0])
+    assert cash0 == 0
+    recs, p, vol, dd, win = {}, {}, {}, {}, {}
     for k, fn in mcps.items():
         rec, m = load_mcp_prices(att / fn, 8)
         recs[k] = (rec, m)
-        p[k] = round(float(m.Close[EXE]), 2)
-        assert abs(float(m.Close[BASE]) - r26["px"].loc[BASE, k]) < 0.006  # 和 10-30 收盘价对得上
-        assert float(m.Dividends.loc[BASE:EXE].abs().sum()) == 0
-    # 10-31、11-01、11-02 按 10-30 日终本金计；执行日 11-03 当天还掉的本金当天不计息，当天利息等还款后按日终本金计
-    acc = Account(pos, cash, con, intr)
-    acc.accrue(3)
-    ser = lambda a: (a.mv(p) + a.cash) / (a.principal + a.intr + r2(a.principal * RATE / 360))  # 含当天利息的日终比例
-    log, sells = [], []
-    pi, parts, rest = acc.repay(acc.cash)
-    acc.cash = rest
-    log.append(["现金直接还款", "", cash, pi, "；".join(f"{a} {w2(b)}" for a, b in parts)])
+        c = m.Close.round(2)
+        w = c[c.index <= EXE].tail(21)
+        assert w.index[-1] == EXE and len(w) == 21
+        assert abs(float(c[BASE]) - r26["px"].loc[BASE, k]) < 0.006
+        assert float(m.Dividends.loc[w.index[0]:EXE].abs().sum()) == 0
+        p[k] = float(c[EXE])
+        vol[k] = float(w.pct_change().dropna().std())
+        dd[k] = round(min(3 * vol[k], LIMIT[board[k]]), 4)
+        win[k] = (w.index[1], w.index[-1])
+    capq = {k: (lots(k, int(pos0[k] * CAP)) or [0])[-1] for k in pos0}
 
-    def conc(a):
-        mv = a.mv(p)
-        return {k: a.pos[k] * p[k] / mv for k in a.pos if a.pos[k] > 0}
+    def mv(s):
+        return sum(s["pos"][k] * p[k] for k in s["pos"])
 
-    def fix_conc(a, step):
+    def ratio(s):
+        return (mv(s) + cash0) / s["debt"]
+
+    def stress(s):
+        return (sum(s["pos"][k] * p[k] * (1 - dd[k]) for k in s["pos"]) + cash0) / s["debt"]
+
+    def conc(s):
+        t = mv(s)
+        return {k: s["pos"][k] * p[k] / t for k in s["pos"] if s["pos"][k] > 0}
+
+    def room(s, k):
+        return capq[k] - (pos0[k] - s["pos"][k])
+
+    def do(s, k, q):
+        amt = r2(q * p[k])
+        fee = r2(amt * FEE27)
+        n = dict(pos=dict(s["pos"]), debt=r2(s["debt"] - r2(amt - fee)))
+        n["pos"][k] -= q
+        return n, dict(code=k, qty=q, amt=amt, fee=fee, net=r2(amt - fee))
+
+    sells = []
+
+    def record(s, o, step):
+        o.update(step=step, debt=s["debt"], conc=max(conc(s).values()), ratio=ratio(s), stress=stress(s))
+        sells.append(o)
+
+    def fix_conc(s, step):
         while True:
-            c = conc(a)
+            c = conc(s)
             over = [k for k in c if c[k] > CONC + 1e-12]
             if not over:
-                return
-            k = max(over, key=lambda x: c[x])
-            for q in lots(k, a.pos[k]):
-                b = copy.deepcopy(a)
-                sell(b, k, q, p[k])
-                if conc(b).get(k, 0) <= CONC:
-                    o = sell(a, k, q, p[k])
-                    o["step"] = step
-                    sells.append((o, copy.deepcopy(a)))
+                return s
+            k = max(over, key=c.get)
+            for q in lots(k, room(s, k)):
+                n, o = do(s, k, q)
+                if conc(n).get(k, 0) <= CONC:
                     break
+            else:
+                raise SystemExit(f"{k} 卖到上限仍超过 30%")
+            s = n
+            record(s, o, step)
 
-    fix_conc(acc, "集中度")
-    order = sorted(pos, key=lambda k: chg[k])
-    while ser(acc) < TGT:
-        k = next(x for x in order if acc.pos[x] > 0)
-        done = False
-        for q in lots(k, acc.pos[k]):
-            b = copy.deepcopy(acc)
-            sell(b, k, q, p[k])
-            if ser(b) >= TGT:
-                o = sell(acc, k, q, p[k])
-                done = True
+    s = dict(pos=dict(pos0), debt=debt0)
+    start = dict(ratio=ratio(s), stress=stress(s), conc=conc(s))
+    s = fix_conc(s, "集中度")
+    order = sorted(pos0, key=lambda k: -dd[k])
+    for k in order:
+        if stress(s) >= STRESS:
+            break
+        qs = lots(k, room(s, k))
+        if not qs:
+            continue
+        for q in qs:
+            n, o = do(s, k, q)
+            if stress(n) >= STRESS:
                 break
-        if not done:
-            o = sell(acc, k, acc.pos[k], p[k])
-        o["step"] = "比例"
-        sells.append((o, copy.deepcopy(acc)))
-        fix_conc(acc, "复查集中度")
-    fix_conc(acc, "复查集中度")
-    assert ser(acc) >= TGT and all(v <= CONC for v in conc(acc).values())
-    pre_fin = ser(acc)
-    day_i = r2(acc.principal * RATE / 360)
-    acc.intr = r2(acc.intr + day_i)
-    fin = (acc.mv(p) + acc.cash) / (acc.principal + acc.intr)
-    assert abs(fin - pre_fin) < 1e-9
+        s = n
+        record(s, o, "压力情景" + ("（到50%上限）" if room(s, k) < (200 if k.startswith("688") else 100) and stress(s) < STRESS else ""))
+        s = fix_conc(s, "复查集中度")
+    assert stress(s) >= STRESS and all(v <= CONC for v in conc(s).values())
+    capped = [k for k in pos0 if pos0[k] - s["pos"][k] == capq[k]]
 
-    print(f"[27] 11-02 价 {p}")
-    for o, a in sells:
-        print(f"     {o['step']} 卖 {NAME[o['code']]} {o['qty']} @ {o['price']} 净 {o['net']} 后比例 {ser(a) * 100:.2f}% 集中度 {max(conc(a).values()) * 100:.2f}%")
-    print(f"     执行后 {fin * 100:.2f}% 本金 {acc.principal} 利息 {acc.intr} 现金 {acc.cash} 持仓 {acc.pos} 集中度 { {NAME[k]: round(v * 100, 2) for k, v in conc(acc).items()} }")
+    print(f"[27] 对账单负债 {debt0}；11-02 价 {p}")
+    print("     压力跌幅 " + " ".join(f"{NAME[k]} {dd[k] * 100:.2f}%（σ {vol[k] * 100:.4f}%）" for k in order))
+    print(f"     起点 比例 {start['ratio'] * 100:.2f}% 压力 {start['stress'] * 100:.2f}% 宁德 {start['conc']['300750'] * 100:.2f}%")
+    for o in sells:
+        print(f"     {o['step']} {NAME[o['code']]} {o['qty']} 成交 {o['amt']} 费用 {o['fee']} 净额 {o['net']} 负债 {o['debt']} "
+              f"集中度 {o['conc'] * 100:.3f}% 比例 {o['ratio'] * 100:.3f}% 压力 {o['stress'] * 100:.3f}%")
+    print(f"     执行后 持仓 {s['pos']} 负债 {s['debt']} 占比 { {NAME[k]: round(v * 100, 2) for k, v in conc(s).items()} } 上限 {capped}")
+    # 错法
+    print(f"     错法：创业板按 10% 封顶，宁德压力跌幅 10.00%；分母 n 时宁德 σ {float(recs['300750'][1].Close.round(2)[:EXE].tail(21).pct_change().dropna().std(ddof=0)) * 100:.4f}%")
+    assert capped == ["300750"] and STRESS - start["stress"] > 0.2
 
     # ---- 输出 ----
-    s_rows = []
-    r_rows = [["现金直接还款", "", cash, pi, "；".join(f"{a} {w2(b)}" for a, b in parts)]]
-    for i, (o, a) in enumerate(sells, 1):
-        s_rows.append([i, o["step"], o["code"], NAME[o["code"]], o["qty"], o["price"], o["amt"], o["comm"], o["stamp"], o["trans"], o["net"],
-                       round(max(conc(a).values()) * 100, 2), round(ser(a) * 100, 2)])
-        r_rows.append([f"卖券还款 {i}", f"{NAME[o['code']]} {o['qty']:,} 股", o["net"], o["pay_i"], "；".join(f"{x} {w2(y)}" for x, y in o["parts"])])
-    mv = acc.mv(p)
-    e_rows = [["担保证券", k, NAME[k], acc.pos[k], p[k], r2(acc.pos[k] * p[k]), round(acc.pos[k] * p[k] / mv * 100, 2), ""] for k in NAME]
-    e_rows += [["融资合约", c[0], "", "", "", c[2], "", f"开仓日 {c[1]}"] for c in acc.con]
-    e_rows += [["应付融资利息", "", "", "", "", acc.intr, "", "含 11-03 当天按还款后本金计的利息"],
-               ["现金余额", "", "", "", "", acc.cash, "", ""],
-               ["担保证券市值合计", "", "", "", "", mv, "", ""],
-               ["维持担保比例(%)", "", "", "", "", round(fin * 100, 2), "", "目标 ≥ 200%，" + ("满足" if fin >= TGT else "不满足")],
-               ["最大单一股票占比(%)", "", "", "", "", round(max(conc(acc).values()) * 100, 2), "", "目标 ≤ 30%，满足"]]
-    o_rows = [[k, NAME[k], recs[k][0]["参数"]["ticker"], recs[k][0]["工具"], "period=1mo, interval=1d", recs[k][0]["查询时间"],
-               str(recs[k][1].Date[EXE]), EXE, p[k]] for k in NAME]
+    p_rows = [[k, NAME[k], board[k], p[k], round(vol[k] * 100, 4), round(3 * vol[k] * 100, 4), round(LIMIT[board[k]] * 100, 0), round(dd[k] * 100, 2),
+               pos0[k], capq[k]] for k in order]
+    s_rows = [[i, o["step"], o["code"], NAME[o["code"]], o["qty"], p[o["code"]], o["amt"], o["fee"], o["net"], o["debt"], round(o["conc"] * 100, 2),
+               round(o["ratio"] * 100, 2), round(o["stress"] * 100, 2)] for i, o in enumerate(sells, 1)]
+    tot = mv(s)
+    e_rows = [["担保证券", k, NAME[k], s["pos"][k], p[k], r2(s["pos"][k] * p[k]), round(s["pos"][k] * p[k] / tot * 100, 2),
+               f"卖出 {pos0[k] - s['pos'][k]:,} 股" + ("，到 50% 上限" if k in capped else "") if pos0[k] != s["pos"][k] else ""] for k in NAME]
+    e_rows += [["担保证券市值合计", "", "", "", "", r2(tot), "", ""],
+               ["现金余额", "", "", "", "", 0.0, "", "卖出净额全部还款"],
+               ["负债合计", "", "", "", "", s["debt"], "", f"11-02 日终 {usd2(debt0)}，减去卖出净额合计 {usd2(r2(debt0 - s['debt']))}"],
+               ["维持担保比例(%)", "", "", "", "", round(ratio(s) * 100, 2), "", ""],
+               ["压力情景比例(%)", "", "", "", "", round(stress(s) * 100, 2), "", "目标 ≥ 180%，满足"],
+               ["最大单一股票占比(%)", "", "", "", "", round(max(conc(s).values()) * 100, 2), "", "目标 ≤ 30%，满足"]]
+    o_rows = [[k, NAME[k], recs[k][0]["参数"]["ticker"], d, str(recs[k][1].Date[d]), float(recs[k][1].Close.round(2)[d])]
+              for k in NAME for d in (win[k][0], EXE)]
     write_xlsx(ans / "两融降杠杆执行方案表.xlsx",
-               [("卖出清单", ["序号", "步骤", "代码", "名称", "卖出股数", "测算价(元)", "成交金额(元)", "佣金(元)", "印花税(元)", "过户费(元)", "卖出净额(元)",
-                          "卖出后最大单一占比(%)", "卖出后维持担保比例(%)"], s_rows),
-                ("还款明细", ["项目", "来源", "还款金额(元)", "还利息(元)", "还本金"], r_rows),
-                ("执行后状态", ["类别", "代码或合约", "名称", "持股数(股)", "11-02收盘价(测算价，元)", "市值或金额(元)", "占担保证券市值(%)", "备注"], e_rows),
-                ("在线数据", ["代码", "名称", "查询代码", "工具", "参数", "查询时间", "返回的Date(UTC)", "对应交易日", "收盘价(元，保留2位)"], o_rows)],
-               notes={"卖出清单": ["成交金额、费用和比例都按 11-02 收盘价（测算价）算。卖出后维持担保比例是执行日 11-03 的日终口径：含 10-31 至 11-02 三天按 10-30 本金计的利息，以及 11-03 当天按这一步还款后本金计的利息。集中度用不四舍五入的原值和 30% 比。",
-                               "卖出顺序：先集中度，再按 10 月涨跌幅从低到高卖到 200%，最后复查集中度。每一步取满足要求的最少股数。"],
-                      "在线数据": [source_line(recs[k][0]) for k in NAME] + ["Date 是 UTC 16:00，加 8 小时后的日期是交易日，11-02 对应 2026-11-01T16:00Z 这一行。"]})
+               [("压力参数", ["代码", "名称", "板块", "11-02收盘价(元)", "日波动率(%)", "3倍日波动率(%)", "涨跌幅限制(%)", "压力跌幅(%)", "11-02持股数(股)", "卖出上限(股)"], p_rows),
+                ("卖出清单", ["序号", "步骤", "代码", "名称", "卖出股数", "测算价(元)", "成交金额(元)", "卖出费用(元)", "卖出净额(元)", "卖出后负债合计(元)",
+                          "卖出后最大单一占比(%)", "卖出后维持担保比例(%)", "卖出后压力情景比例(%)"], s_rows),
+                ("执行后状态", ["类别", "代码", "名称", "持股数(股)", "11-02收盘价(元)", "市值或金额(元)", "占担保证券市值(%)", "备注"], e_rows),
+                ("在线数据", ["代码", "名称", "查询代码", "交易日", "返回的Date(UTC)", "收盘价(元，保留2位)"], o_rows)],
+               notes={"压力参数": [f"日波动率用 {win['300750'][0]} 至 {EXE} 的 20 个日收益，样本标准差。压力跌幅 = min(3 × 日波动率, 涨跌幅限制)，保留两位小数。按压力跌幅从高到低排列，也就是卖出顺序。",
+                                "卖出上限 = 11-02 持股数 × 50%，按申报单位向下取整。"],
+                      "卖出清单": [f"起点：负债 {usd2(debt0)} 元，维持担保比例 {start['ratio'] * 100:.2f}%，压力情景比例 {start['stress'] * 100:.2f}%，宁德时代占 {start['conc']['300750'] * 100:.2f}%。",
+                               "卖出费用 = 成交金额 × 0.076%，四舍五入到分；卖出净额全部还款。集中度用原值和 30% 比。"],
+                      "在线数据": [source_line(recs[k][0]) for k in NAME] + ["Date 是 UTC 16:00，加 8 小时后的日期是交易日；11-02 对应 2026-11-01T16:00Z 这一行。表里列出每只股票波动率窗口的第一个交易日和 11-02 两行。"]})
     agg = {}
-    for o, _ in sells:
+    for o in sells:
         agg[o["code"]] = agg.get(o["code"], 0) + o["qty"]
-    names = "、".join(f"{NAME[k]} {v:,} 股" for k, v in agg.items())
-    write_docx(ans / "两融降杠杆执行方案.docx", "量化多头二号 两融账户11月3日降杠杆执行方案", [
-        ("结论", [f"方案按 11-02 收盘价测算，交易部 11-03 执行：先用账户现金 {w2(cash)} 元直接还款，再卖出 {names}，所得全部还款。"
-                f"按测算价，执行后维持担保比例 {pc(fin)}，最大单一股票占比 {pc(max(conc(acc).values()))}，两项目标都满足。11-03 实际成交价和测算价不同的，交易部按同样的顺序和目标收尾。"]),
-        ("为什么这样卖", [f"按 11-02 收盘价，还款前宁德时代占担保证券市值 {pc(pos['300750'] * p['300750'] / sum(pos[k] * p[k] for k in pos))}，超过 30%，先卖宁德时代。"]
-         + [f"第 {i} 笔（{o['step']}）：{NAME[o['code']]} {o['qty']:,} 股，成交 {w2(o['amt'])} 元，净额 {w2(o['net'])} 元；卖完以后比例 {pc(ser(a))}，最大单一占比 {pc(max(conc(a).values()))}。"
-            for i, (o, a) in enumerate(sells, 1)]
-         + ["10 月涨跌幅从低到高是：" + "、".join(f"{NAME[k]} {chg[k]:.2f}%" for k in order) + "。"]),
-        ("还款以后", [f"融资本金还剩 {w2(acc.principal)} 元：" + "，".join(f"{c[0]} {w2(c[2])} 元" for c in acc.con) + f"。应付利息 {w2(acc.intr)} 元。"]),
-        ("数据", ["11-02 收盘价（测算价）通过 US Stocks MCP 查询，代码后缀 .SS、.SZ，Date 加 8 小时取交易日，保留两位小数："
+    write_docx(ans / "两融降杠杆执行方案.docx", "量化多头二号 两融账户11月3日降杠杆卖出方案", [
+        ("结论", ["按 11-02 收盘价测算，交易部 11-03 卖出" + "、".join(f"{NAME[k]} {v:,} 股" for k, v in agg.items()) + "，所得全部还款。"
+                f"执行后负债 {usd2(s['debt'])} 元，维持担保比例 {ratio(s) * 100:.2f}%，压力情景比例 {stress(s) * 100:.2f}%，最大单一股票占比 {max(conc(s).values()) * 100:.2f}%，两项目标都满足。"
+                "11-03 实际成交价和测算价不同的，交易部按同样的顺序和目标收尾。"]),
+        ("压力跌幅", ["按 11-02 往前 20 个交易日的日波动率乘 3，不超过涨跌幅限制：" + "、".join(f"{NAME[k]} {dd[k] * 100:.2f}%" for k in order) + "。"
+                   f"宁德时代是创业板，涨跌幅限制 20%，3 倍日波动率 {3 * vol['300750'] * 100:.2f}% 没有超过限制。",
+                   f"起点负债按华东证券 11-02 对账单 {usd2(debt0)} 元，维持担保比例 {start['ratio'] * 100:.2f}%，压力情景比例 {start['stress'] * 100:.2f}%。"]),
+        ("为什么这样卖", [f"还款以后宁德时代占担保证券市值 {start['conc']['300750'] * 100:.2f}%，超过 30%，先卖它。"]
+         + [f"第 {i} 笔，{o['step']}：{NAME[o['code']]} {o['qty']:,} 股，成交 {usd2(o['amt'])} 元，净额 {usd2(o['net'])} 元；卖完以后压力情景比例 {o['stress'] * 100:.2f}%，最大单一占比 {o['conc'] * 100:.2f}%。"
+            for i, o in enumerate(sells, 1)]
+         + [f"宁德时代两笔合计 {agg['300750']:,} 股，到了 11-02 持股 50% 的上限，压力情景比例还不够，按压力跌幅顺序换中芯国际。"
+            "中芯国际是科创板，超过 200 股的部分可以按 1 股申报。"]),
+        ("数据", ["6 只股票近 3 个月日线通过 US Stocks MCP 查询，代码后缀 .SS、.SZ，Date 加 8 小时取交易日，收盘价保留两位小数。11-02 收盘价："
                 + "，".join(f"{NAME[k]} {p[k]:.2f}" for k in NAME) + "。10-30 收盘价和复核表一致。"]),
     ])
-    return dict(sells=sells, fin=fin, acc=acc, p=p)
+    return dict(sells=sells, s=s)
+
+
+usd2 = w2
 
 
 if __name__ == "__main__":
