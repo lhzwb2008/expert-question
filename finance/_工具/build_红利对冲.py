@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
 """打包「港股红利组合恒指期货对冲与保证金储备核定」（三轮链的第三轮）：题目附件、标准答案附件。
 
-输入是第二轮标准答案《港股红利组合建仓方案表.xlsx》的「建仓清单」和「汇总」（原样复制进本题的题目附件），
-加上本题自己的附件：A01 候选池前复权日线（LongPort，换成以基准日为锚点）、A02 对冲口径、A03 保证金储备与交付，
-以及恒生指数日线的 MCP 结果文件。保证金标准是 A03 里拟的。
+作答时，模型用的是它自己在上一轮完成的《港股红利组合建仓方案表.xlsx》的「建仓清单」和「汇总」。
+2026-11-26 最终质检返修后，第二轮标答不再放进本题的题目附件；本题标准答案直接读第二轮的标准答案附件
+（先按顺序跑 build_红利筛选.py、build_红利建仓.py），也就是按正确的前轮结果计算。
+本题自己的附件：A01 候选池前复权日线（LongPort，换成以基准日为锚点）、A02 对冲口径、A03 保证金储备与交付，
+恒生指数日线的 MCP 结果文件，以及 _工具/补充材料/15/ 下的 B01 至 B17 背景、历史和版本材料（xlsx、docx、csv 由同目录的生成脚本生成，md 是手写的）。
+保证金标准是 A03 里拟的。
 
 脚本做的事：
-1. 生成 A01，复制 A02、A03 和 MCP 结果文件。
-2. 只用第二轮的建仓方案表、本题附件和 MCP 结果文件重算，生成标准答案附件。
-3. 算一遍常见错误的结果。
+1. 生成 A01，复制 A02、A03、MCP 结果文件和补充材料。
+2. 用第二轮标准答案附件里的建仓方案表、本题附件和 MCP 结果文件重算，生成标准答案附件。
+3. 算一遍常见错误的结果；检查补充材料没有写出本题的答案数字。
 """
 from __future__ import annotations
 
@@ -22,7 +25,7 @@ from pathlib import Path
 import pandas as pd
 from openpyxl import load_workbook
 
-from build_common import OUT, copy_as, fresh_dir, load_mcp_prices, source_line, write_docx, write_xlsx
+from build_common import OUT, copy_as, copy_materials, fresh_dir, load_mcp_prices, source_line, write_docx, write_xlsx
 
 HERE = Path(__file__).resolve().parent
 RAW = HERE / "新题数据" / "港股红利对冲"
@@ -108,6 +111,26 @@ def plan(b: float, mv: F, idx: F, m10: F, usable: F):
     return tgt_n, target, final, verdict
 
 
+def material_text(path: Path) -> str:
+    """补充材料的全部文字，用来检查有没有写出本题答案。"""
+    if path.suffix == ".xlsx":
+        wb = load_workbook(path, data_only=True)
+        return "\n".join(str(c) for ws in wb.worksheets for row in ws.iter_rows(values_only=True) for c in row if c is not None)
+    if path.suffix == ".docx":
+        from docx import Document
+        d = Document(str(path))
+        return "\n".join([x.text for x in d.paragraphs] + [c.text for t in d.tables for r in t.rows for c in r.cells])
+    return path.read_text(encoding="utf-8")
+
+
+def check_no_answer(att: Path, names: list[str], banned: list[str]) -> None:
+    for n in names:
+        text = material_text(att / n).replace(",", "")
+        hit = [b for b in banned if b in text]
+        assert not hit, (n, hit)
+
+
+
 def main() -> None:
     att = fresh_dir(DST / "题目附件")
     ans = fresh_dir(DST / "标准答案附件")
@@ -128,10 +151,11 @@ def main() -> None:
     copy_as(DOC / "A02_对冲口径.md", att / f"{PREFIX}A02_对冲口径.md")
     copy_as(DOC / "A03_保证金储备与交付.md", att / f"{PREFIX}A03_保证金储备与交付.md")
     copy_as(DST / "MCP结果文件" / MCP_FILE, att / MCP_FILE)
-    copy_as(PREV, att / PREV.name)
+    extra = copy_materials("15", att)
+    assert len(extra) >= 16, extra
 
-    # 2. 只用第二轮建仓方案表、本题附件和 MCP 结果文件重算
-    hold, assets, cash, mv = read_plan(att / PREV.name)
+    # 2. 用第二轮标准答案附件里的建仓方案表（正确的前轮结果）、本题附件和 MCP 结果文件重算
+    hold, assets, cash, mv = read_plan(PREV)
     assert sum(h["sh"] * h["close"] for h in hold) == mv
     a01 = pd.read_csv(att / f"{PREFIX}A01_候选池前复权日线.csv", dtype={"code": str, "date": str, "adj_close": str})
     prices = a01.pivot(index="date", columns="code", values="adj_close").sort_index()
@@ -226,12 +250,21 @@ def main() -> None:
                         f"恒指期货减到 {final['big']} 张后，储备 {fl(final['reserve']):,.2f} 港元（初始保证金 {fl(final['margin']):,.2f}，压力追加 {fl(final['stress']):,.2f}），"
                         f"不超过可动用现金；{final['big']} 张是目标 {target['big']} 张的 {final['big'] / target['big'] * 100:.2f}%，不少于30%。"]),
             ("压力情景", [f"过去五年（{STRESS0} 至 {BASE}）恒生指数最大10日涨幅 {pc(m10)}，从 {start10} 的 {win[start10]:.2f} 涨到 {end10} 的 {win[end10]:.2f}。"]),
-            ("在线数据", ["内部快照没有恒生指数，日线通过 US Stocks MCP 查询，代码 ^HSI。返回的 Date 是 UTC 时间，加 8 小时后才是香港的交易日；"
-                      f"不换算会把恒指日收益整体错开一天，Beta 会算成 {bu:.4f}。"]),
+            ("在线数据", ["内部快照没有恒生指数，日线通过 US Stocks MCP 查询（数据来自 Yahoo Finance，2026-11-18 查询），代码 ^HSI，日期按香港交易日归属；"
+                      f"日期没对到香港交易日的话，会把恒指日收益整体错开一天，Beta 会算成 {bu:.4f}。"]),
             ("对应材料", ["逐日收益见《港股红利组合对冲测算表.xlsx》的「组合日收益」，两个窗口的 Beta 见「Beta估计」，目标和最终张数、储备和可动用现金见「对冲张数」，"
                       "恒生指数收盘价和查询信息见「在线数据」。"]),
         ],
     )
+    # 补充材料不能写出本题的答案：Beta、张数对应的名义和储备、可动用现金、最大10日涨幅和起止点位、基准日恒指
+    banned = [f"{bs[n]['beta']:.4f}" for n in WINDOWS] + [f"{fl(tgt_n):.4f}", f"{fl(usable):.2f}", f"{fl(gap):.2f}", pc(m10),
+              f"{fl(idx):.2f}", f"{win[start10]:.2f}", f"{win[end10]:.2f}", f"{fl(cash):.2f}", f"{fl(mv):.2f}", f"{fl(assets):.2f}",
+              start10, end10]
+    for s in (target, final):
+        banned += [f"{fl(s[k]):.2f}" for k in ("notional", "margin", "stress", "reserve")]
+    banned += [f"{target['big']}张", f"{final['big']}张", pc(final["ratio"])]
+    check_no_answer(att, extra, banned)
+    print(f"补充材料 {len(extra)} 份，没有写出本题答案数字；题目附件共 {len(list(att.iterdir()))} 份")
     print("查询时间", rec["查询时间"], len(h), "行", h.index[0], h.index[-1])
 
 

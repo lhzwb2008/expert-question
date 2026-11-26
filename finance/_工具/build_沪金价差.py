@@ -30,6 +30,7 @@ P = "价差_"
 MCP = f"{P}MCP_美元兑人民币日线.json"
 START, END = "2021-11-01", "2026-10-30"
 OZ, RATE, WIN, LO, HI = 31.1034768, 0.02, 250, 5, 95
+NA = "缺数"  # 「逐日价差」里真正缺失的单元格写这两个字；空白只用在备注列
 
 
 def trading_day(ts: pd.Series) -> pd.Series:
@@ -41,6 +42,43 @@ def trading_day(ts: pd.Series) -> pd.Series:
 
 def pct_inc(x, q):
     return float(np.percentile(np.asarray(x, dtype=float), q, method="linear"))
+
+
+def check_missing_days(xlsx: Path, a: pd.DataFrame, x: pd.Series, fx: pd.DataFrame, days: list[str], miss: list[str]) -> None:
+    """回读「逐日价差」，逐个缺数日直接从 A01、A02 和汇率返回重新取数核对（不复用上面的中间结果）：
+    已取得的七列和来源一致，依赖伦敦金的四列写「缺数」；有效日的十二列都是取得的数。"""
+    from openpyxl import load_workbook
+    ws = load_workbook(xlsx)["逐日价差"]
+    head = [c.value for c in ws[1]]
+    got = {}
+    for cells in ws.iter_rows(min_row=2, values_only=True):
+        if cells[0] and str(cells[0])[:2] == "20" and len(str(cells[0])) == 10:
+            got[cells[0]] = dict(zip(head, cells))
+    london = ["伦敦金价(美元/盎司)", "伦敦金人民币价(元/克)", "境内外价差(元/克)", "不折持有成本的价差(元/克)"]
+    known = ["合约", "最后交易日", "剩余自然日", "沪金价(元/克)", "沪金折现货价(元/克)", "汇率所属伦敦日期", "美元兑人民币"]
+    fxs = fx.assign(c4=fx.Close.round(4)).set_index("ld").c4.sort_index()
+    for d, g in got.items():
+        if d not in miss:
+            assert all(g[h] not in (None, "", NA) for h in known + london), d
+            continue
+        prev = days[days.index(d) - 1]
+        v = a[a.td == prev].groupby("Contract").Volume.sum()
+        c = sorted(v[v == v.max()].index)[0]
+        d15 = dt.date(2000 + int(c[2:4]), int(c[4:6]), 15)
+        ltd_ = next(day for day in days if day >= d15.isoformat())
+        assert all(not (d15.isoformat() <= day < ltd_) for day in days)
+        n = (dt.date.fromisoformat(ltd_) - dt.date.fromisoformat(d)).days
+        bar = a[(a.DateTime == f"{d} 11:25:00") & (a.Contract == c)].Close
+        assert len(bar) == 1
+        fd = fxs.index[fxs.index < d][-1]
+        want = {"合约": c, "最后交易日": ltd_, "剩余自然日": n, "沪金价(元/克)": float(bar.iloc[0]),
+                "沪金折现货价(元/克)": round(float(bar.iloc[0]) / (1 + RATE * n / 365), 4), "汇率所属伦敦日期": fd, "美元兑人民币": float(fxs[fd])}
+        assert {h: g[h] for h in known} == want, (d, {h: g[h] for h in known}, want)
+        assert not any(t.startswith(d) for t in x.index), d          # A02 这一天确实没有午休 1 分钟线
+        assert all(g[h] == NA for h in london) and g["备注"].startswith("缺数日：伦敦金11:29 没有 K 线"), d
+        print(f"     缺数日 {d}：{c} 最后交易日 {ltd_} 剩 {n} 天，沪金 {want['沪金价(元/克)']} 折现货 {want['沪金折现货价(元/克)']}，"
+              f"汇率 {fd} {want['美元兑人民币']}；伦敦金四列「{NA}」")
+    assert sorted(miss) == sorted(d for d in got if d in miss) and len(miss) == 10
 
 
 def main() -> None:
@@ -96,14 +134,17 @@ def main() -> None:
         k = (f"{d} 11:25:00", c)
         lk = f"{d} 11:29:00"
         lack = [n for n, ok in (("沪金11:25", k in sh.index), ("伦敦金11:29", lk in x.index)) if not ok]
-        if lack:
-            miss.append((d, c, "、".join(lack) + " 没有 K 线"))
-            continue
-        p_sh, p_x = float(sh[k]), float(x[lk])
+        # 2026-11-26 最终质检：缺数日只缺伦敦金 11:29，沪金价、合约规则和汇率仍能取得，照常算出来列进表里
+        assert lack in ([], ["伦敦金11:29"]), (d, lack)
+        p_sh = float(sh[k])
         fd, f = fx_before(d)
         l = ltd(c)
         n = (dt.date.fromisoformat(l) - dt.date.fromisoformat(d)).days
         spot = p_sh / (1 + RATE * n / 365)
+        if lack:
+            miss.append((d, c, "、".join(lack) + " 没有 K 线", dict(ltd=l, n=n, sh=p_sh, spot=spot, fd=fd, fx=f)))
+            continue
+        p_x = float(x[lk])
         ext = p_x * f / OZ
         rows.append(dict(d=d, c=c, ltd=l, n=n, sh=p_sh, spot=spot, x=p_x, fd=fd, fx=f, ext=ext, pr=spot - ext, raw=p_sh - ext))
     r = pd.DataFrame(rows)
@@ -146,7 +187,8 @@ def main() -> None:
 
     # ---- 输出 ----
     d_rows = [[z.d, z.c, z.ltd, int(z.n), z.sh, round(z.spot, 4), z.x, z.fd, z.fx, round(z.ext, 4), round(z.pr, 4), round(z.raw, 4), ""] for z in r.itertuples()]
-    d_rows += [[m[0], m[1], "", "", "", "", "", "", "", "", "", "", "缺数日：" + m[2]] for m in miss]
+    d_rows += [[m[0], m[1], m[3]["ltd"], int(m[3]["n"]), m[3]["sh"], round(m[3]["spot"], 4), NA, m[3]["fd"], m[3]["fx"], NA, NA, NA,
+                f"缺数日：{m[2]}。伦敦金价、伦敦金人民币价和两列价差记「{NA}」，其余字段已取得。"] for m in miss]
     d_rows.sort(key=lambda q: q[0])
     y_rows = [[z["y"], z["n"], round(z["mean"], 4), round(z["med"], 4), round(z["max"], 4), z["dmax"], round(z["min"], 4), z["dmin"], z["neg"]] for z in yr]
     a_rows = [[e["d"], round(e["pr"], 4), round(e["lo"], 4), round(e["hi"], 4), e["side"]] for e in alerts]
@@ -161,11 +203,13 @@ def main() -> None:
                 ("预警记录", ["交易日", "境内外价差(元/克)", "下限(元/克)", "上限(元/克)", "预警方向"], a_rows),
                 ("在线数据", ["交易日", "汇率所属伦敦日期", "美元兑人民币(收盘，保留4位)"], o_rows)],
                notes={"逐日价差": [f"{START} 至 {END}，有效日 {len(r)} 个，缺数日 {len(miss)} 个（伦敦金 11:29 没有 K 线）。",
+                               f"缺数日只缺伦敦金 11:29 的价格，依赖它的四列写「{NA}」，其余各列照常取得、算法同有效日；缺数日不进年度统计和预警带。",
                                "沪金折现货价 = 沪金价 ÷ (1 + 2.00% × 剩余自然日 ÷ 365)；伦敦金人民币价 = 伦敦金价 × 汇率 ÷ 31.1034768。"],
                       "预警记录": [f"每天的预警带用这一天之前 250 个有效日价差的 5%、95% 分位（线性插值）。2026 年触发 {len(alerts)} 天，其中溢价 {n_alert_hi} 天、折价 {len(alerts) - n_alert_hi} 天。"],
                       "在线数据": [source_line(rec), f"返回 {raw_n} 行，伦敦日期 {fdays[0]} 至 {fdays[-1]}。",
                                "Date 是伦敦时间零点：英国夏令时期间写成前一天 23:00 UTC，其余写成当天 00:00 UTC，加 1 小时后取日期就是伦敦日期。",
                                "11:30 时当天外汇日线还没收盘，每个交易日用伦敦日期早于它的最近一行的收盘价。上表列出 2026 年 10 月用到的汇率。"]})
+    check_missing_days(ans / "沪金境内外价差监测表.xlsx", a, x, fx, days, [m[0] for m in miss])
     f2 = lambda v: f"{v:.2f}"
     write_docx(ans / "沪金境内外价差监测说明.docx", "沪金境内外价差序列编制与11月预警带", [
         ("结论", [f"11 月的价差预警带是 {f2(nov[0])} 至 {f2(nov[1])} 元/克（截至 2026-10-30 的 250 个有效日价差的 5% 和 95% 分位）。",

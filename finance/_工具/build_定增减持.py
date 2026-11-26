@@ -14,7 +14,7 @@ from pathlib import Path
 import pandas as pd
 from openpyxl import load_workbook
 
-from build_common import OUT, copy_as, fresh_dir, load_mcp_prices, source_line, write_docx, write_xlsx
+from build_common import OUT, copy_as, copy_materials, fresh_dir, load_mcp_prices, source_line, write_docx, write_xlsx
 
 HERE = Path(__file__).resolve().parent
 RAW = HERE / "新题数据"
@@ -89,6 +89,8 @@ def q28():
         for x in LEDGER:
             wr.writerow([x[0], x[1], x[2], x[3], NAME[x[3]], "集中竞价", x[4]])
     copy_as(DOC / "定增筛查" / "A03_筛查口径与交付.md", att / "筛查_A03_筛查口径与交付.md")
+    bmat = copy_materials("28", att)  # 2026-11 返修补的背景、历史和版本材料
+    print(f"[28] 补充材料 {len(bmat)} 份，题目附件共 {len(list(att.iterdir()))} 份")
 
     # 只用附件重算
     a01 = pd.read_csv(att / "筛查_A01_定增持仓与解禁安排.csv", dtype={"证券代码": str})
@@ -144,13 +146,31 @@ def q28():
                       "11-02额度": ["1% 额度按总股本计算，向下取整到股。"],
                       "在线数据": [source_line(recs[c][0]) for c in recs] + ["Date 是 UTC 16:00，加 8 小时后的日期是交易日。这 20 个交易日里没有除权除息，Close 和不复权收盘价相同。"]})
     li = [x for x in rows if x["listed"]]
+
+    def reason(x):
+        if x["unlock"] <= START:
+            cond = f"{x['unlock']} 已解禁，11 月 2 日起即可卖出"
+        else:
+            cond = f"{x['unlock']} 解禁，自解禁日起方可卖出，{x['unlock']} 之前不得卖出"
+        return (f"{x['name']}：{cond}；最近 20 个交易日（{x['start20']} 至 {BASE}）每日收盘价都不低于定增成本价，"
+                f"最低收盘价 {x['lo']:.2f} 元（{x['lo_day']}），高于成本价 {x['cost']:.2f} 元，不浮亏，列入 11 月减持名单。")
+
+    # 说明里逐只写的解禁条件和不浮亏依据，必须和筛查表「减持名单」的名单、最低价、日期一致
+    xlsx_lo = {r[0]: (r[6], r[7], r[9], r[5]) for r in l_rows}  # 代码 ->（最低价, 最低价日期, 列入, 最早可卖日）
+    for x in li:
+        assert xlsx_lo[x["code"]] == (x["lo"], x["lo_day"], "列入", x["first"]), (x["code"], xlsx_lo[x["code"]])
+        assert x["lo"] > x["cost"]
+    assert xlsx_lo["002049"][3] == "2026-11-09"  # 紫光国微自解禁日起可卖的限制
+    assert xlsx_lo["002371"][2] == "不列入"
     write_docx(ans / "定增解禁减持筛查说明.docx", "定增优选1号 解禁持仓11月减持前筛查说明", [
         ("结论", ["列入 11 月减持名单的 4 只：" + "、".join(f"{x['name']}（11-02 可用额度 {quota[x['code']]['avail']:,} 股{'，' + x['first'] + ' 起可卖' if x['first'] > START else ''}）" for x in li) + "。",
-                "北方华创不减持：最近 20 个交易日最低收盘价 {:.2f} 元（{}），低于定增成本价 {:.2f} 元。".format(rows[0]["lo"], rows[0]["lo_day"], rows[0]["cost"])]),
+                "北方华创不减持：最近 20 个交易日（{} 至 {}）最低收盘价 {:.2f} 元（{}），低于定增成本价 {:.2f} 元，按投委会不浮亏的要求 11 月不减持。".format(
+                    rows[0]["start20"], BASE, rows[0]["lo"], rows[0]["lo_day"], rows[0]["cost"])]),
+        ("各只列入理由", [reason(x) for x in li]),
         ("额度", [f"{x['name']}：总股本 {x['tot']:,} 股，1% 额度 {quota[x['code']]['q1']:,} 股，窗口内本公司已卖 {quota[x['code']]['used']:,} 股，11-02 可用 {quota[x['code']]['avail']:,} 股。" for x in rows],),
         ("额度占用里没计入的", ["中微公司 2026-08-04 定增优选2号卖出 1,500,000 股，早于 11-02 窗口起点 2026-08-05，不占额度。",
                          "中微公司 2026-09-22 华南某基金管理公司卖出 3,000,000 股，不是本公司管理的产品，不合并。"]),
-        ("数据", ["5 只股票收盘价通过 US Stocks MCP 查询，Date 加 8 小时取交易日；这 20 个交易日没有除权除息，Close 就是不复权收盘价。"]),
+        ("数据", ["5 只股票收盘价通过 US Stocks MCP 查询（数据来自 Yahoo Finance，2026-11-19 查询），日期按A股交易日；这 20 个交易日没有除权除息，收盘价就是不复权收盘价。"]),
     ])
     return rows, quota
 
@@ -196,7 +216,7 @@ def schedule(lst, led, q1, cap, days):
 def q29(r28):
     att, ans = fresh_dir(D29 / "题目附件"), fresh_dir(D29 / "标准答案附件")
     (D29 / "MCP结果文件").mkdir(exist_ok=True)
-    copy_as(D28 / "标准答案附件" / "定增解禁减持筛查表.xlsx", att / "定增解禁减持筛查表.xlsx")
+    # 题目附件不再放第一轮标答《定增解禁减持筛查表.xlsx》；本题直接读第一轮的标答计算结果（上一轮模型的成果由同一对话承接）
     copy_as(DOC / "定增排程" / "A01_排程口径与交付.md", att / "排程_A01_排程口径与交付.md")
     files = {}
     for p in POS:
@@ -206,7 +226,9 @@ def q29(r28):
         copy_as(RAW / "定增排程" / f"{p[1]}.json", D29 / "MCP结果文件" / fn)
         copy_as(D29 / "MCP结果文件" / fn, att / fn)
         files[p[0]] = fn
-    lst, led, q1 = read28(att / "定增解禁减持筛查表.xlsx")
+    bmat = copy_materials("29", att)
+    print(f"[29] 补充材料 {len(bmat)} 份，题目附件共 {len(list(att.iterdir()))} 份")
+    lst, led, q1 = read28(D28 / "标准答案附件" / "定增解禁减持筛查表.xlsx")
     cap, adv, recs, rng = {}, {}, {}, {}
     for code in [c for c in lst if lst[c]["listed"]]:
         rec, m = load_mcp_prices(att / files[code], 8)
@@ -241,12 +263,38 @@ def q29(r28):
                notes={"逐日排程": ["当天 90 日额度剩余 = 1% 额度 − 往前 89 天到当天窗口里本公司已卖和本排程已排的股数（不含当天）。计划卖出取三项最小值，向下取到 100 股。"],
                       "在线数据": [source_line(recs[c][0]) for c in recs if lst[c]["listed"]] + ["Date 是 UTC 16:00，加 8 小时取交易日。Volume 单位是股。"]})
     li = [c for c in lst if lst[c]["listed"]]
+    # 逐日卖出：按「逐日排程」里每个实际卖出日的日期和股数，额度受限日和尾日写实际数量
+    daily = {}
+    for r in rows:  # [交易日, 代码, 名称, 单日上限, 额度剩余, 卖前剩余, 计划卖出, 卡在哪一项]
+        if r[6] > 0:
+            daily.setdefault(r[1], []).append((r[0], r[6], r[7]))
+
+    def daily_line(c):
+        parts = []
+        for d, n, why in daily[c]:
+            tag = "（额度受限）" if why == "90日额度" else ("（尾日卖完）" if why == "剩余持股" else "")
+            parts.append(f"{d} {n:,} 股{tag}")
+        return f"{lst[c]['name']}：" + "、".join(parts) + f"，合计 {summ[c]['tot']:,} 股。"
+
+    # 复核排程说明用到的逐日股数、单日上限、合计、起止日、停卖日和排程表逐项一致
+    _wb = load_workbook(ans / "11月减持排程表.xlsx", data_only=True)
+    _cap = {str(r[0]): int(r[6]) for r in _wb["单日上限"].iter_rows(min_row=2, values_only=True) if r and r[0] and str(r[0]).isdigit()}
+    _plan = {(r[0], str(r[1])): int(r[6]) for r in _wb["逐日排程"].iter_rows(min_row=2, values_only=True)
+             if r and r[0] and str(r[0]).startswith("2026") and r[6]}
+    _summ = {str(r[0]): dict(tot=int(r[4]), first=r[5], last=r[6], pause=([] if r[8] == "无" else str(r[8]).split("、")))
+             for r in _wb["排程汇总"].iter_rows(min_row=2, values_only=True) if r and r[0] and str(r[0]).isdigit()}
+    assert _cap == cap and _plan == plan
+    for c in li:
+        assert _summ[c]["tot"] == summ[c]["tot"] and _summ[c]["first"] == summ[c]["first"] and _summ[c]["last"] == summ[c]["last"]
+        assert _summ[c]["pause"] == summ[c]["pause"]
+        assert sum(n for _, n, _ in daily[c]) == summ[c]["tot"]
     write_docx(ans / "11月减持排程说明.docx", "定增优选1号 11月集中竞价减持排程说明", [
         ("结论", ["11 月排 4 只，全部能在月内卖完：" + "；".join(f"{lst[c]['name']} {summ[c]['tot']:,} 股，{summ[c]['first']} 至 {summ[c]['last']}" for c in li) + "。北方华创筛查没列入，不排。"]),
         ("单日上限", [f"{lst[c]['name']}：10-30 往前 20 个交易日日均成交量 {adv[c]:,.2f} 股，5% 取整后每天最多 {cap[c]:,} 股。" for c in li]),
+        ("逐日卖出", [daily_line(c) for c in li]),
         ("额度停卖", [f"{lst[c]['name']}：{'、'.join(summ[c]['pause'])} 因为 90 日额度用完停卖，等早先的卖出出了窗口再接着卖。" for c in li if summ[c]["pause"]]
          + [f"紫光国微 {lst['002049']['first']} 解禁，从这天起排。"]),
-        ("数据", ["成交量通过 US Stocks MCP 查询，Date 加 8 小时取交易日，单位是股。"]),
+        ("数据", ["成交量通过 US Stocks MCP 查询（数据来自 Yahoo Finance，2026-11-19 查询），日期按A股交易日，单位是股。"]),
     ])
     return dict(lst=lst, led=led, q1=q1, cap=cap, plan=plan, days=days)
 
@@ -260,8 +308,7 @@ def fees(amt):
 def q30(r29):
     att, ans = fresh_dir(D30 / "题目附件"), fresh_dir(D30 / "标准答案附件")
     (D30 / "MCP结果文件").mkdir(exist_ok=True)
-    copy_as(D28 / "标准答案附件" / "定增解禁减持筛查表.xlsx", att / "定增解禁减持筛查表.xlsx")
-    copy_as(D29 / "标准答案附件" / "11月减持排程表.xlsx", att / "11月减持排程表.xlsx")
+    # 题目附件不再放第一、二轮标答《定增解禁减持筛查表.xlsx》《11月减持排程表.xlsx》；本题直接读前两轮的标答计算结果
     copy_as(DOC / "定增复核" / "A02_复核口径与交付.md", att / "复核_A02_复核口径与交付.md")
     files = {}
     for p in POS:
@@ -269,6 +316,8 @@ def q30(r29):
         copy_as(RAW / "定增复核" / f"{p[1]}.json", D30 / "MCP结果文件" / fn)
         copy_as(D30 / "MCP结果文件" / fn, att / fn)
         files[p[0]] = fn
+    bmat = copy_materials("30", att)
+    print(f"[30] 补充材料 {len(bmat)} 份，题目附件共 {len(list(att.iterdir()))} 份")
     hl = {}
     for p in POS:
         rec, m = load_mcp_prices(att / files[p[0]], 8)
@@ -304,9 +353,9 @@ def q30(r29):
         wr.writerow(["成交日", "证券代码", "证券名称", "方向", "成交股数(股)", "成交均价(元)"])
         for (d, c), n in a01:
             wr.writerow([d, c, NAME[c], "卖出", n, f"{price[(d, c)]:.2f}"])
-    # ---- 只用附件重算 ----
-    lst, led, q1 = read28(att / "定增解禁减持筛查表.xlsx")
-    wb = load_workbook(att / "11月减持排程表.xlsx", data_only=True)
+    # ---- 用本题附件和前两轮的成果重算 ----
+    lst, led, q1 = read28(D28 / "标准答案附件" / "定增解禁减持筛查表.xlsx")
+    wb = load_workbook(D29 / "标准答案附件" / "11月减持排程表.xlsx", data_only=True)
     capx = {str(r[0]): int(r[6]) for r in wb["单日上限"].iter_rows(min_row=2, values_only=True) if r and r[0] and str(r[0]).isdigit()}
     planx = {}
     for r in wb["逐日排程"].iter_rows(min_row=2, values_only=True):
@@ -375,7 +424,7 @@ def q30(r29):
         ("卖了多少钱", [f"11-02 至 11-17 合计卖出 {tot['n']:,} 股，成交金额 {w2(tot['amt'])} 元，费用 {w2(tot['fee'])} 元，净额 {w2(tot['net'])} 元，已实现收益 {w2(tot['pnl'])} 元。"]
          + [f"{r[1]}：成交金额 {w2(r[5])} 元，净额 {w2(r[7])} 元，已实现收益 {w2(r[8])} 元，11-17 日终剩余 {r[9]:,} 股。" for r in s_rows[:-1] if r[2]]
          + [f"长电科技 {bad_px[0]} 的成交均价是录错的，金额先按回报算，更正后要重算。"]),
-        ("数据", ["当天最低价、最高价通过 US Stocks MCP 查询，Date 加 8 小时取交易日。"]),
+        ("数据", ["当天最低价、最高价通过 US Stocks MCP 查询（数据来自 Yahoo Finance，2026-11-19 查询），日期按A股交易日。"]),
     ])
     return dict(viol=viol, money=money, tot=tot, s_rows=s_rows, chk=chk)
 

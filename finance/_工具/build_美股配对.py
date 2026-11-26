@@ -21,6 +21,7 @@ SRC = CASES / "二期" / "pairs_desk"
 DST = OUT / "题目" / "06_美股配对筛选"
 PREFIX = "美股配对_"
 PAIR = ("XOM", "CVX")
+MONEY, ZFMT = "0.00", "0.0000"
 RENAME = {
     "A01_prices.csv": "A01_股票复权日线.csv",
     "A02_pairs.csv": "A02_候选对名单.csv",
@@ -88,6 +89,10 @@ def main() -> None:
                 "返回里的股价、市值、估值等字段是查询当时的快照，本题不使用。",
             ],
         },
+        formats={  # 2026-11-26 最终质检：金额显示 2 位小数，z 值显示 4 位小数（A04、题面），和 Word 写法一致，不加千分位
+            "候选对判定表": {"净收益(美元)": MONEY, "最差一笔净收益(美元)": MONEY},
+            "上线对逐笔交易": {"开仓z值": ZFMT, "平仓z值": ZFMT, "净收益(美元)": MONEY},
+        },
     )
 
     # 标准答案附件：docx
@@ -120,9 +125,8 @@ def main() -> None:
                 f"平仓 z 值 {t2.exit_z:.4f}，净收益 {t2.pnl:.2f} 美元。",
             ]),
             ("行业核对", [
-                f"定下 XOM/CVX 之后，用 US Stocks MCP 的 get_stock_info 分别查询了两只股票：XOM 的查询时间是 {info['XOM'][0]['查询时间']}，"
-                f"CVX 的查询时间是 {info['CVX'][0]['查询时间']}。"
-                f"XOM 返回的公司名称是 {a['longName']}，CVX 是 {b['longName']}。两只的 sector 都是 {a['sector']}，industry 都是 {a['industry']}。",
+                f"定下 XOM/CVX 之后，{info['XOM'][0]['查询时间'][:10]} 通过 US Stocks MCP（数据来自 Yahoo Finance）查了两只股票的公司资料。"
+                f"XOM 的公司名称是 {a['longName']}，CVX 是 {b['longName']}。两只的 sector 都是 {a['sector']}，industry 都是 {a['industry']}。",
                 f"两只股票目前属于同一行业，和 A02 的行业标注「{tag}」相符，同行业配对的前提成立。",
             ]),
             ("对应材料", ["8 对候选的统计见《美股配对筛选测算表.xlsx》的「候选对判定表」，XOM/CVX 的 20 笔交易见「上线对逐笔交易」，"
@@ -130,6 +134,42 @@ def main() -> None:
         ],
     )
     print("抽查：", t1.to_dict(), t2.to_dict(), sep="\n  ")
+
+    # 核对 3：回读两份成品。所有非整数的数字列都有数字格式（金额 0.00、z 值 0.0000），
+    # 值本身已按位数取舍；Word 里出现的每个数都能在测算表里按同样位数找到，选择一致。
+    import re
+    from docx import Document
+    from openpyxl import load_workbook
+    wb = load_workbook(ans / "美股配对筛选测算表.xlsx")
+    want_fmt = {"候选对判定表": {"净收益(美元)": MONEY, "最差一笔净收益(美元)": MONEY},
+                "上线对逐笔交易": {"开仓z值": ZFMT, "平仓z值": ZFMT, "净收益(美元)": MONEY}, "在线数据": {}}
+    shown = set()
+    for ws in wb.worksheets:
+        head = [c.value for c in ws[1]]
+        for cells in ws.iter_rows(min_row=2):
+            for h, c in zip(head, cells):
+                v = c.value
+                if isinstance(v, bool) or not isinstance(v, (int, float)):
+                    continue
+                if h in want_fmt[ws.title]:
+                    fmt = want_fmt[ws.title][h]
+                    nd = len(fmt.split(".")[1])
+                    assert c.number_format == fmt and round(v, nd) == v, (ws.title, c.coordinate, v, c.number_format)
+                    shown.add(f"{v:.{nd}f}")
+                else:  # 其余数字列只有笔数、次数这类整数
+                    assert isinstance(v, int), (ws.title, c.coordinate, v)
+                    shown.add(str(v))
+    body = "\n".join(p.text for p in Document(ans / "美股配对上线建议.docx").paragraphs)
+    nums = re.findall(r"-?\d+\.\d+", body)
+    assert nums and all(x in shown for x in nums), [x for x in nums if x not in shown]
+    for _, r in table.iterrows():
+        assert f"{r.pair}：{s(r.pair)}" in body
+    jt = wb["候选对判定表"]
+    ok_rows = [jt.cell(i, 1).value for i in range(2, 10) if jt.cell(i, 7).value == "是"]
+    best_xlsx = max(ok_rows, key=lambda p: next(jt.cell(i, 3).value for i in range(2, 10) if jt.cell(i, 1).value == p))
+    assert f"上线 {choice}" in body and best_xlsx == choice
+    assert wb["上线对逐笔交易"].max_row >= len(led) + 1 and wb["上线对逐笔交易"].cell(len(led) + 1, 1).value == led.iloc[-1].entry_date
+    print(f"核对 3：测算表数字格式全部到位，Word 里 {len(nums)} 个小数都能在测算表里按同样位数找到，选择 {choice} 一致")
 
 
 if __name__ == "__main__":

@@ -1,0 +1,118 @@
+{
+ "查询时间": "2026-11-26 12:04:20",
+ "接口": "LongPort OpenAPI QuoteContext.static_info",
+ "参数": {
+  "symbols": [
+   "0700.HK",
+   "9988.HK",
+   "0941.HK",
+   "1299.HK",
+   "2318.HK",
+   "0883.HK",
+   "0388.HK",
+   "6990.HK",
+   "1952.HK",
+   "9969.HK",
+   "9626.HK",
+   "3896.HK"
+  ]
+ },
+ "返回": [
+  {
+   "symbol": "0700.HK",
+   "name_cn": "腾讯控股",
+   "lot_size": 100,
+   "currency": "HKD",
+   "total_shares": 9092644829,
+   "circulating_shares": 9092644829
+  },
+  {
+   "symbol": "9988.HK",
+   "name_cn": "阿里巴巴-W",
+   "lot_size": 100,
+   "currency": "HKD",
+   "total_shares": 19901959514,
+   "circulating_shares": 19901959514
+  },
+  {
+   "symbol": "0941.HK",
+   "name_cn": "中国移动",
+   "lot_size": 500,
+   "currency": "HKD",
+   "total_shares": 21702251023,
+   "circulating_shares": 20799483156
+  },
+  {
+   "symbol": "1299.HK",
+   "name_cn": "友邦保险",
+   "lot_size": 200,
+   "currency": "HKD",
+   "total_shares": 10346644870,
+   "circulating_shares": 10346644870
+  },
+  {
+   "symbol": "2318.HK",
+   "name_cn": "中国平安",
+   "lot_size": 500,
+   "currency": "HKD",
+   "total_shares": 18107641995,
+   "circulating_shares": 7447576912
+  },
+  {
+   "symbol": "0883.HK",
+   "name_cn": "中国海洋石油",
+   "lot_size": 1000,
+   "currency": "HKD",
+   "total_shares": 47529953984,
+   "circulating_shares": 44539953984
+  },
+  {
+   "symbol": "0388.HK",
+   "name_cn": "香港交易所",
+   "lot_size": 100,
+   "currency": "HKD",
+   "total_shares": 1267836895,
+   "circulating_shares": 1267836895
+  },
+  {
+   "symbol": "6990.HK",
+   "name_cn": "科伦博泰生物",
+   "lot_size": 100,
+   "currency": "HKD",
+   "total_shares": 239023969,
+   "circulating_shares": 176822257
+  },
+  {
+   "symbol": "1952.HK",
+   "name_cn": "云顶新耀",
+   "lot_size": 500,
+   "currency": "HKD",
+   "total_shares": 354678672,
+   "circulating_shares": 354678672
+  },
+  {
+   "symbol": "9969.HK",
+   "name_cn": "诺诚健华",
+   "lot_size": 1000,
+   "currency": "HKD",
+   "total_shares": 1767202139,
+   "circulating_shares": 1493798235
+  },
+  {
+   "symbol": "9626.HK",
+   "name_cn": "哔哩哔哩-W",
+   "lot_size": 20,
+   "currency": "HKD",
+   "total_shares": 399751168,
+   "circulating_shares": 323918495
+  },
+  {
+   "symbol": "3896.HK",
+   "name_cn": "金山云",
+   "lot_size": 2000,
+   "currency": "HKD",
+   "total_shares": 4531784801,
+   "circulating_shares": 4531784801
+  }
+ ]
+}

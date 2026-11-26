@@ -11,6 +11,7 @@ A01、A02 快照收录十一只股票，云顶新耀（1952.HK）留给在线 MC
 1. 生成 A01（日成交量）和 A02（持仓清单，含基准日收盘价）。
 2. 只用题目附件加云顶新耀的 MCP 结果文件重算，生成标准答案附件。
 3. 检查 30% 赎回情景离档位边界的距离，并算一遍常见错误的结果。
+2026-11-26 最终质检返修：题目附件加了 16 份补充材料（_工具/补充材料/12/，见那里的生成脚本），标准答案不变。
 """
 from __future__ import annotations
 
@@ -21,7 +22,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from build_common import OUT, copy_as, fresh_dir, load_mcp_prices, source_line, write_docx, write_xlsx
+from build_common import OUT, copy_as, copy_materials, fresh_dir, load_mcp_prices, source_line, write_docx, write_xlsx
 
 HERE = Path(__file__).resolve().parent
 RAW = HERE / "新题数据" / "港股流动性"
@@ -108,6 +109,9 @@ def main() -> None:
     copy_as(DOC / "A03_流动性口径.md", att / f"{PREFIX}A03_流动性口径.md")
     copy_as(DOC / "A04_定档规则与交付.md", att / f"{PREFIX}A04_定档规则与交付.md")
     copy_as(DST / "MCP结果文件" / MCP_FILE, att / MCP_FILE)
+    # 2026-11-26 最终质检返修补的背景、历史和版本材料（B01 至 B16），由 补充材料/12/生成补充材料.py 生成，这里原样复制
+    extra = copy_materials("12", att)
+    assert len(extra) == 16, extra
 
     # 2. 只用题目附件重算
     hold = list(csv.DictReader(open(att / f"{PREFIX}A02_持仓清单.csv", encoding="utf-8")))
@@ -210,8 +214,8 @@ def main() -> None:
                 f"科伦博泰生物-B 的 ADV20 是 {fl(kl['adv20']):,.2f} 股，ADV60 是 {fl(kl['adv60']):,.2f} 股，近期成交放大。按口径取较小的 ADV60，日可变现量 {kl['cap']:,} 股，变现天数 {kl['days']} 天。",
             ]),
             ("在线数据", [
-                "研究部的快照没有收录云顶新耀。它的日线通过 US Stocks MCP 查询，代码 1952.HK。返回的日期是 UTC 时间，加 8 小时后才是香港的交易日；"
-                f"返回期间内没有分红和拆分，收盘价和成交量都没有调整。基准日 {BASE} 收盘 {fl(x['close']):.2f} 港元，市值 {fl(x['value']):,.2f} 港元。",
+                f"研究部的快照没有收录云顶新耀。它的日线通过 US Stocks MCP 查询（数据来自 Yahoo Finance，{rec['查询时间'][:10]} 查询），代码 1952.HK，日期按香港交易日归属；"
+                f"数据期间内没有分红和拆分，收盘价和成交量都没有调整。基准日 {BASE} 收盘 {fl(x['close']):.2f} 港元，市值 {fl(x['value']):,.2f} 港元。",
             ]),
             ("对应材料", ["十二只股票的日均量和变现天数见《港股持仓变现能力测算表.xlsx》的「持仓变现能力」，可变现比例见「变现阶梯」，四档赎回的所需天数和瓶颈股票见「赎回情景」，"
                       "云顶新耀的成交量和查询信息见「在线数据」。两份文件的结论、所需天数、瓶颈股票和可变现比例相同。"]),

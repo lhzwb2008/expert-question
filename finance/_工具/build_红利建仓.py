@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 """打包「港股红利组合建仓权重与税后股息率测算」（三轮链的第二轮）：题目附件、标准答案附件。
 
-输入是第一轮标准答案《港股红利候选池筛选表.xlsx》的「入选名单」（原样复制进本题的题目附件），
-加上本题自己的附件：A01 证券资料（每手股数来自 LongPort，税务类别是下面 TAX 里拟的）、A02 建仓口径、A03 产品要素，
-以及港币兑人民币汇率的 MCP 结果文件。
+作答时，模型用的是它自己在上一轮完成的《港股红利候选池筛选表.xlsx》的「入选名单」。
+2026-11-26 最终质检返修后，第一轮标答不再放进本题的题目附件；本题标准答案直接读第一轮的标准答案附件
+（先跑 build_红利筛选.py），也就是按正确的前轮结果计算。
+本题自己的附件：A01 证券资料（每手股数来自 LongPort，税务类别是下面 RED、OTHER 里拟的）、A02 建仓口径、A03 产品要素，
+港币兑人民币汇率的 MCP 结果文件，以及 _工具/补充材料/14/ 下的 B01 至 B16 背景、历史和版本材料（由同目录的生成脚本生成）。
 
 脚本做的事：
-1. 生成 A01，复制 A02、A03 和 MCP 结果文件。
-2. 只用第一轮的筛选表、本题附件和 MCP 结果文件重算，生成标准答案附件。第三轮读这里生成的建仓方案表。
-3. 算一遍常见错误的结果。
+1. 生成 A01，复制 A02、A03、MCP 结果文件和补充材料。
+2. 用第一轮标准答案附件里的筛选表、本题附件和 MCP 结果文件重算，生成标准答案附件。第三轮读这里生成的建仓方案表。
+3. 算一遍常见错误的结果；检查补充材料没有写出本题的答案数字。
 """
 from __future__ import annotations
 
@@ -19,8 +21,10 @@ from fractions import Fraction as F
 from pathlib import Path
 
 from openpyxl import load_workbook
+from openpyxl.styles import Alignment
 
-from build_common import OUT, copy_as, fresh_dir, load_mcp, source_line, write_docx, write_xlsx
+from build_common import (OUT, copy_as, copy_materials, fresh_dir, load_mcp, scrub_office, source_line, text_width, write_docx,
+                          write_xlsx)
 
 HERE = Path(__file__).resolve().parent
 RAW = HERE / "新题数据" / "港股红利建仓"
@@ -126,6 +130,37 @@ def tier_text(t) -> str:
     return "不设年度分配目标" if t is None else f"{float(t) * 100:.1f}%"
 
 
+def fit_labels(path: Path, sheet: str, rows: range) -> None:
+    """「汇总」A 列的项目名较长（汇率方向、三类税后股息），按中文双宽再留两成余量设列宽并换行，正常视区里能读全。"""
+    wb = load_workbook(path)
+    ws = wb[sheet]
+    need = max(text_width(ws.cell(r, 1).value) for r in rows)
+    ws.column_dimensions["A"].width = max(ws.column_dimensions["A"].width or 0, round(need * 1.2 + 4))
+    for r in rows:
+        ws.cell(r, 1).alignment = Alignment(vertical="center", wrap_text=True)
+    wb.save(path)
+    scrub_office(path)
+
+
+def material_text(path: Path) -> str:
+    """补充材料的全部文字，用来检查有没有写出本题答案。"""
+    if path.suffix == ".xlsx":
+        wb = load_workbook(path, data_only=True)
+        return "\n".join(str(c) for ws in wb.worksheets for row in ws.iter_rows(values_only=True) for c in row if c is not None)
+    if path.suffix == ".docx":
+        from docx import Document
+        d = Document(str(path))
+        return "\n".join([x.text for x in d.paragraphs] + [c.text for t in d.tables for r in t.rows for c in r.cells])
+    return path.read_text(encoding="utf-8")
+
+
+def check_no_answer(att: Path, names: list[str], banned: list[str]) -> None:
+    for n in names:
+        text = material_text(att / n).replace(",", "")
+        hit = [b for b in banned if b in text]
+        assert not hit, (n, hit)
+
+
 def main() -> None:
     att = fresh_dir(DST / "题目附件")
     ans = fresh_dir(DST / "标准答案附件")
@@ -142,10 +177,11 @@ def main() -> None:
     copy_as(DOC / "A02_建仓口径.md", att / f"{PREFIX}A02_建仓口径.md")
     copy_as(DOC / "A03_产品要素与交付.md", att / f"{PREFIX}A03_产品要素与交付.md")
     copy_as(DST / "MCP结果文件" / MCP_FILE, att / MCP_FILE)
-    copy_as(PREV, att / PREV.name)
+    extra = copy_materials("14", att)
+    assert len(extra) >= 16 and len(list(att.iterdir())) >= 20, extra
 
-    # 2. 只用第一轮筛选表、本题附件和 MCP 结果文件重算
-    sel = read_selection(att / PREV.name)
+    # 2. 用第一轮标准答案附件里的筛选表（正确的前轮结果）、本题附件和 MCP 结果文件重算
+    sel = read_selection(PREV)
     a01 = list(csv.DictReader(open(att / f"{PREFIX}A01_证券资料.csv", encoding="utf-8")))
     lots = {r["code"]: int(r["lot_size"]) for r in a01}
     taxes = {r["code"]: r["tax_type"] for r in a01}
@@ -220,6 +256,7 @@ def main() -> None:
             ],
         },
     )
+    fit_labels(ans / "港股红利组合建仓方案表.xlsx", "汇总", range(2, len(s_rows) + 2))
     top_cap = next(x for x in res["rows"] if x["code"] in capped)
     banks = [x for x in res["rows"] if x["ind"] == "银行"]
     wt = wrong["漏算预提税"]
@@ -245,6 +282,15 @@ def main() -> None:
                       "产品资产、现金、税后股息率和分配目标见「汇总」，汇率和查询信息见「在线数据」。"]),
         ],
     )
+    # 补充材料不能写出本题的答案：权重、股数、产品资产、现金、税后股息率、可分配能力、汇率取值
+    banned = [f"{fl(fx):.6f}", f"{fl(res['assets']):.2f}", f"{fl(res['cash']):.2f}", f"{fl(res['mv']):.2f}", f"{fl(res['net']):.2f}",
+              f"{fl(stock_tgt):.2f}", f"{fl(res['ny']) * 100:.4f}", f"{fl(res['cap']) * 100:.4f}", f"{fl(res['ny']) * 100:.2f}%",
+              f"{fl(res['cap']) * 100:.2f}%"]
+    banned += [f"{fl(w0[c]) * 100:.4f}" for c in w0] + [f"{fl(w[c]) * 100:.4f}" for c in w]
+    banned += [f"{fl(v):.2f}" for v in by_tax.values()] + [f"{fl(x['net']):.2f}" for x in res["rows"]]
+    banned += [str(x["sh"]) for x in res["rows"] if x["sh"] >= 100_000] + [str(fx_row["Close"])[:10]]
+    check_no_answer(att, extra, banned)
+    print(f"补充材料 {len(extra)} 份，没有写出本题答案数字；题目附件共 {len(list(att.iterdir()))} 份")
     print("查询时间", rec["查询时间"])
 
 

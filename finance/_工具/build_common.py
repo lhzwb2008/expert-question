@@ -28,10 +28,32 @@ def copy_as(src: Path, dst: Path) -> None:
     shutil.copyfile(src, dst)
 
 
-def write_xlsx(path: Path, sheets: list[tuple[str, list[str], list[list]]], notes: dict[str, list[str]] | None = None) -> None:
-    """sheets: [(工作表名, 表头, 行)]。notes: 工作表名 -> 表格下方的说明行。"""
+MAX_COL_WIDTH = 46
+LINE_HEIGHT = 15.0
+
+
+def text_width(value) -> int:
+    """单元格文字在 Excel 里大约占几个字符宽：中文和全角符号算 2，其余算 1。"""
+    import unicodedata
+    if value is None:
+        return 0
+    if isinstance(value, float):
+        value = f"{value:,.4f}"
+    return sum(2 if unicodedata.east_asian_width(ch) in "WF" else 1 for ch in str(value))
+
+
+def _lines(value, width: float) -> int:
+    import math
+    return max(1, sum(math.ceil(max(text_width(part), 1) / max(width - 1, 1)) for part in str(value).split("\n")))
+
+
+def write_xlsx(path: Path, sheets: list[tuple[str, list[str], list[list]]], notes: dict[str, list[str]] | None = None,
+               formats: dict[str, dict[str, str]] | None = None) -> None:
+    """sheets: [(工作表名, 表头, 行)]。notes: 工作表名 -> 表格下方的说明行。
+    formats: 工作表名 -> {表头: 数字格式}，例如 {"净收益": "#,##0.00", "开仓z值": "0.0000"}。"""
     wb = Workbook()
     wb.remove(wb.active)
+    wrap = Alignment(vertical="top", wrap_text=True)
     for name, header, rows in sheets:
         ws = wb.create_sheet(name)
         ws.append(header)
@@ -41,12 +63,38 @@ def write_xlsx(path: Path, sheets: list[tuple[str, list[str], list[list]]], note
         for r in rows:
             ws.append(r)
         ws.freeze_panes = "A2"
+        fmt = (formats or {}).get(name, {})
+        widths = []
         for i, h in enumerate(header, 1):
-            width = max([len(str(h)) * 2] + [len(str(r[i - 1])) for r in rows if i - 1 < len(r)] + [8])
-            ws.column_dimensions[get_column_letter(i)].width = min(width + 2, 60)
+            col = [r[i - 1] for r in rows if i - 1 < len(r)]
+            need = max([text_width(h)] + [text_width(v) for v in col] + [8])
+            width = min(need + 2, MAX_COL_WIDTH)
+            widths.append(width)
+            ws.column_dimensions[get_column_letter(i)].width = width
+            if h in fmt:
+                for cell in ws.iter_rows(min_row=2, max_row=len(rows) + 1, min_col=i, max_col=i):
+                    if isinstance(cell[0].value, (int, float)):
+                        cell[0].number_format = fmt[h]
+        ws.row_dimensions[1].height = LINE_HEIGHT * max(_lines(h, w) for h, w in zip(header, widths))
+        for ri, r in enumerate(rows, 2):
+            n = 1
+            for ci, v in enumerate(r):
+                if ci < len(widths) and isinstance(v, str) and text_width(v) > widths[ci] - 2:
+                    ws.cell(ri, ci + 1).alignment = wrap
+                    n = max(n, _lines(v, widths[ci]))
+            if n > 1:
+                ws.row_dimensions[ri].height = LINE_HEIGHT * n
+        span = max(len(header), 6)
+        span_width = sum(widths) + sum(10 for _ in range(span - len(widths)))
+        for c in range(len(widths) + 1, span + 1):
+            ws.column_dimensions[get_column_letter(c)].width = 10
         for line in (notes or {}).get(name, []):
             ws.append([])
             ws.append([line])
+            row = ws.max_row
+            ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=span)
+            ws.cell(row, 1).alignment = wrap
+            ws.row_dimensions[row].height = LINE_HEIGHT * _lines(line, span_width)
     path.parent.mkdir(parents=True, exist_ok=True)
     wb.save(path)
     scrub_office(path)
@@ -76,68 +124,99 @@ def write_docx(path: Path, title: str, blocks: list[tuple[str, list[str]]]) -> N
     scrub_office(path)
 
 
-_CORE = ('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
-         '<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" '
-         'xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" '
-         'xmlns:dcmitype="http://purl.org/dc/dcmitype/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">'
-         '<dc:creator></dc:creator><cp:lastModifiedBy></cp:lastModifiedBy>{rev}'
-         '<dcterms:created xsi:type="dcterms:W3CDTF">{t}</dcterms:created>'
-         '<dcterms:modified xsi:type="dcterms:W3CDTF">{t}</dcterms:modified></cp:coreProperties>')
-_APP_XL = ('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
-           '<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" '
-           'xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"><Application>Microsoft Excel</Application>'
-           '<DocSecurity>0</DocSecurity><ScaleCrop>false</ScaleCrop><HeadingPairs><vt:vector size="2" baseType="variant">'
-           '<vt:variant><vt:lpstr>Worksheets</vt:lpstr></vt:variant><vt:variant><vt:i4>{n}</vt:i4></vt:variant></vt:vector></HeadingPairs>'
-           '<TitlesOfParts><vt:vector size="{n}" baseType="lpstr">{names}</vt:vector></TitlesOfParts><Company></Company>'
-           '<LinksUpToDate>false</LinksUpToDate><SharedDoc>false</SharedDoc><HyperlinksChanged>false</HyperlinksChanged>'
-           '<AppVersion>16.0300</AppVersion></Properties>')
-_APP_DOC = ('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
-            '<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" '
-            'xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"><Template>Normal.dotm</Template>'
-            '<TotalTime>{mins}</TotalTime><Pages>{pages}</Pages><Words>{words}</Words><Characters>{chars}</Characters>'
-            '<Application>Microsoft Office Word</Application><DocSecurity>0</DocSecurity><Lines>{lines}</Lines>'
-            '<Paragraphs>{paras}</Paragraphs><ScaleCrop>false</ScaleCrop><Company></Company><LinksUpToDate>false</LinksUpToDate>'
-            '<CharactersWithSpaces>{chars_sp}</CharactersWithSpaces><SharedDoc>false</SharedDoc>'
-            '<HyperlinksChanged>false</HyperlinksChanged><AppVersion>16.0000</AppVersion></Properties>')
+_APP_DOCX = ('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
+             '<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" '
+             'xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes">'
+             '<Template>Normal.dotm</Template><TotalTime>0</TotalTime><Words>{words}</Words><Characters>{chars}</Characters>'
+             '<DocSecurity>0</DocSecurity><Paragraphs>{paras}</Paragraphs><ScaleCrop>false</ScaleCrop>'
+             '<LinksUpToDate>false</LinksUpToDate><CharactersWithSpaces>{chars_sp}</CharactersWithSpaces>'
+             '<SharedDoc>false</SharedDoc><HyperlinksChanged>false</HyperlinksChanged></Properties>')
+
+
+def _scrub_docx_parts(files: dict[str, bytes]) -> set[str]:
+    """去掉 python-docx 默认模板带进来的痕迹，返回要删掉的部件名。
+    - core.xml 的「generated by python-docx」说明和空的标题、主题、关键词、类别；
+    - 模板自带的缩略图（docProps/thumbnail.jpeg）和 settings 里的 savePreviewPicture；
+    - 模板自带的 customXml（固定 itemID 的参考文献数据源）；
+    - settings 里模板固定的 rsid 列表和 w14:docId；
+    - core.xml 里模板自带的创建时间 2013-12-23，换成生成时间；
+    - document、styles 里模板的 rsid；
+    - app.xml 里模板的程序名、零字数和 AppVersion，按正文重新数字数，不写程序名。"""
+    import re
+    drop = {n for n in files if n == "docProps/thumbnail.jpeg" or n.startswith("customXml/")}
+    core = files.get("docProps/core.xml")
+    if core is not None:
+        core = re.sub(rb"<dc:description>[^<]*</dc:description>|<dc:description/>", b"", core)
+        for tag in (rb"dc:title", rb"dc:subject", rb"cp:keywords", rb"cp:category"):
+            core = re.sub(rb"<" + tag + rb"/>|<" + tag + rb"></" + tag + rb">", b"", core)
+        if b"2013-12-23T23:15:00Z" in core:  # 模板自带的创建时间，换成这次生成的时间
+            import datetime as dt
+            now = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ").encode()
+            core = core.replace(b"2013-12-23T23:15:00Z", now)
+        files["docProps/core.xml"] = core
+    files["_rels/.rels"] = re.sub(rb'<Relationship [^>]*Target="docProps/thumbnail\.jpeg"[^>]*/>', b"", files["_rels/.rels"])
+    rels = "word/_rels/document.xml.rels"
+    if rels in files:
+        files[rels] = re.sub(rb'<Relationship [^>]*Target="\.\./customXml/[^"]*"[^>]*/>', b"", files[rels])
+    ct = files["[Content_Types].xml"]
+    ct = re.sub(rb'<Override PartName="/customXml/[^"]*"[^>]*/>', b"", ct)
+    if not any(n.lower().endswith((".jpeg", ".jpg")) for n in files if n not in drop):
+        ct = re.sub(rb'<Default Extension="jpe?g"[^>]*/>', b"", ct)
+    files["[Content_Types].xml"] = ct
+    st = files.get("word/settings.xml")
+    if st is not None:
+        st = re.sub(rb"<w:savePreviewPicture/>", b"", st)
+        st = re.sub(rb"<w:rsids>.*?</w:rsids>", b"", st, flags=re.S)
+        st = re.sub(rb'<w14:docId [^>]*/>', b"", st)
+        st = st.replace(b'w:eastAsia="ja-JP"', b'w:eastAsia="zh-CN"')
+        files["word/settings.xml"] = st
+    for n in ("word/document.xml", "word/styles.xml", "word/stylesWithEffects.xml"):
+        if n in files:
+            b = re.sub(rb' w:rsid[A-Za-z]*="[0-9A-F]{8}"', b"", files[n])
+            files[n] = re.sub(rb'<w:rsid w:val="[0-9A-F]{8}"/>', b"", b)
+    app = files.get("docProps/app.xml", b"")
+    if b"<Words>0</Words>" in app or b"<Application></Application>" in app or b"<Application/>" in app:
+        body = re.sub(rb"<[^>]+>", b"", re.sub(rb"</w:p>", b"\n", files["word/document.xml"])).decode("utf-8")
+        paras = [p for p in body.split("\n") if p.strip()]
+        files["docProps/app.xml"] = _APP_DOCX.format(
+            words=sum(len(re.findall(r"[\u4e00-\u9fff]|[A-Za-z0-9.,%\-]+", p)) for p in paras),
+            chars=sum(len(p.replace(" ", "")) for p in paras), paras=len(paras),
+            chars_sp=sum(len(p) for p in paras)).encode("utf-8")
+    return drop
 
 
 def scrub_office(path: Path) -> None:
-    """把 openpyxl / python-docx 写进文件属性里的程序名、作者和缩略图换成和 Office 另存时一样的样子。"""
-    import datetime as dt
+    """清掉文件属性里的作者和最后修改人；docx 另外去掉 python-docx 默认模板的痕迹（见 _scrub_docx_parts）。
+    不改写 xlsx 的程序名，也不伪造编辑时长。"""
     import re
     import zipfile
-    from xml.sax.saxutils import escape
 
-    t = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     with zipfile.ZipFile(path) as z:
         items = [(i, z.read(i.filename)) for i in z.infolist()]
     files = {i.filename: b for i, b in items}
-    out = []
-    if "xl/workbook.xml" in files:
-        names = re.findall(r'<sheet [^>]*name="([^"]+)"', files["xl/workbook.xml"].decode("utf-8"))
-        files["docProps/core.xml"] = _CORE.format(rev="", t=t).encode("utf-8")
-        files["docProps/app.xml"] = _APP_XL.format(n=len(names), names="".join(f"<vt:lpstr>{escape(n)}</vt:lpstr>" for n in names)).encode("utf-8")
-    else:
-        body = re.sub(r"<[^>]+>", "", re.sub(r"</w:p>", "\n", files["word/document.xml"].decode("utf-8")))
-        paras = [p for p in body.split("\n") if p.strip()]
-        chars = sum(len(p.replace(" ", "")) for p in paras)
-        words = sum(len(re.findall(r"[\u4e00-\u9fff]|[A-Za-z0-9.,%\-]+", p)) for p in paras)
-        files["docProps/core.xml"] = _CORE.format(rev="<cp:revision>2</cp:revision>", t=t).encode("utf-8")
-        files["docProps/app.xml"] = _APP_DOC.format(
-            mins=max(3, chars // 120), pages=max(1, chars // 900 + 1), words=words, chars=chars, lines=max(1, chars // 40),
-            paras=len(paras), chars_sp=sum(len(p) for p in paras)).encode("utf-8")
-        files.pop("docProps/thumbnail.jpeg", None)
-        files["_rels/.rels"] = re.sub(rb'<Relationship [^>]*thumbnail\.jpeg"[^>]*/>', b"", files["_rels/.rels"])
-        ct = files["[Content_Types].xml"]
-        if b"thumbnail.jpeg" not in files["_rels/.rels"] and not any(k.endswith((".jpeg", ".jpg")) for k in files):
-            ct = re.sub(rb'<Default [^>]*Extension="jpe?g"[^>]*/>', b"", ct)
-        files["[Content_Types].xml"] = ct
+    core = files.get("docProps/core.xml")
+    if core is not None:
+        # openpyxl 写的是 <dc:creator xmlns:dc="...">openpyxl</dc:creator>，标签里带命名空间属性
+        core = re.sub(rb"<dc:creator([^>]*?)(?:/>|>.*?</dc:creator>)", rb"<dc:creator\1></dc:creator>", core)
+        core = re.sub(rb"<cp:lastModifiedBy([^>]*?)(?:/>|>.*?</cp:lastModifiedBy>)", rb"<cp:lastModifiedBy\1></cp:lastModifiedBy>", core)
+        files["docProps/core.xml"] = core
+    drop = _scrub_docx_parts(files) if "word/document.xml" in files else set()
     with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as z:
-        seen = set()
         for i, _ in items:
-            if i.filename in files and i.filename not in seen:
-                seen.add(i.filename)
-                z.writestr(i.filename, files[i.filename])
+            if i.filename not in drop:
+                z.writestr(i, files[i.filename])
+
+
+def copy_materials(key: str, att: Path) -> list[str]:
+    """把 `_工具/补充材料/<key>/` 下的文件（不含隐藏文件和 .py）原样复制进题目附件，返回文件名。
+    补充材料是 2026-11 最终质检返修时补的背景、历史和版本材料，由各链的脚本生成或手写在这里。"""
+    src = Path(__file__).resolve().parent / "补充材料" / key
+    names = []
+    for p in sorted(src.iterdir()) if src.exists() else []:
+        if p.is_file() and not p.name.startswith(".") and p.suffix != ".py":
+            copy_as(p, att / p.name)
+            names.append(p.name)
+    return names
 
 
 def num(x: str):

@@ -2,7 +2,9 @@
 """打包「行业轮动一号」的三道题（16 仓位核定 → 17 人民币回撤回放 → 18 11月调仓与换汇）。
 
 17 读 16 的标准答案《专户11月仓位核定表.xlsx》，18 只读 17 的结论《专户回撤回放意见.docx》（最终仓位和五只 ETF 的权重）。
-前一轮定稿的成果原样复制进后一轮的题目附件，后一轮从自己的附件里读。16 已经定稿，默认不重跑；要重跑写 `python3 build_行业专户.py 16 17 18`。
+2026-11-26 最终质检返修：后一轮的题目附件不再放前一轮的标答，模型用自己上一轮做的成果；
+本脚本的标答仍直接读前一轮 `标准答案附件/` 里正确的结果。17、18 另外复制 `_工具/补充材料/17|18/` 里的背景、历史和版本材料，
+并检查这些材料里没有出现本题的答案数字。16 默认不重跑；要重跑写 `python3 build_行业专户.py 16 17 18`。
 
 ETF 日线、VIX、汇率都是 fetch_新题.py 通过 US Stocks MCP 查回来的。每道题留一项给在线查询：
 16 是 VIX（近 5 年），17 是美元兑人民币，18 是 7 只 ETF 近 3 个月的日线（11-02 收盘价和成交量）。
@@ -17,7 +19,7 @@ import numpy as np
 import pandas as pd
 from openpyxl import load_workbook
 
-from build_common import OUT, copy_as, fresh_dir, load_mcp_prices, source_line, write_docx, write_xlsx
+from build_common import OUT, copy_as, copy_materials, fresh_dir, load_mcp_prices, source_line, text_width, write_docx, write_xlsx
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -65,6 +67,55 @@ def read_prices(path: Path) -> pd.DataFrame:
 
 def floor_step(x: float) -> float:
     return math.floor(round(x / STEP, 9)) * STEP
+
+
+def check_visible(path: Path, cells: dict[str, list[str]]) -> None:
+    """核对指定单元格在正常列宽下能看全：不合并的单元格要么列宽够，要么自动换行且行高够；
+    合并的说明行要自动换行，行高按合并区的总列宽够放下全部文字。2026-11-26 质检点名 16 的这几格。"""
+    from openpyxl.utils import column_index_from_string, get_column_letter
+    wb = load_workbook(path)
+    for sheet, refs in cells.items():
+        ws = wb[sheet]
+        merged = {r.coord.split(":")[0]: r for r in ws.merged_cells.ranges}
+        for ref in refs:
+            c = ws[ref]
+            need = text_width(c.value)
+            if ref in merged:
+                rg = merged[ref]
+                width = sum(ws.column_dimensions[get_column_letter(i)].width or 8.43 for i in range(rg.min_col, rg.max_col + 1))
+            else:
+                width = ws.column_dimensions[get_column_letter(column_index_from_string(c.column_letter))].width or 8.43
+            lines = math.ceil(need / max(width - 1, 1))
+            height = ws.row_dimensions[c.row].height or 15.0
+            ok = need <= width - 1 or (c.alignment.wrap_text and height >= 15.0 * lines)
+            assert ok, (sheet, ref, need, width, height)
+            print(f"     {sheet}!{ref} 文字宽 {need}，可用宽 {width:.0f}，{lines} 行，行高 {height:.0f}：能看全")
+
+
+def material_text(path: Path) -> str:
+    """补充材料的全部文字，用来查有没有写出本题答案。"""
+    if path.suffix == ".xlsx":
+        wb = load_workbook(path, data_only=True)
+        return "\n".join(str(v) for ws in wb for row in ws.iter_rows(values_only=True) for v in row if v is not None)
+    if path.suffix == ".docx":
+        from docx import Document
+        return "\n".join(p.text for p in Document(path).paragraphs)
+    return path.read_text(encoding="utf-8-sig")
+
+
+def check_no_leak(att: Path, names: list[str], banned: list[str]) -> None:
+    import re
+    for n in names:
+        text = material_text(att / n)
+        for b in banned:
+            hit = re.search(rf"(?<![\d.,]){re.escape(b)}(?!\d)", text)
+            assert not hit, (n, b, text[max(0, hit.start() - 30):hit.end() + 30])
+    print(f"     补充材料 {len(names)} 份，没有出现 {len(banned)} 个答案数字")
+
+
+def num_forms(x: float, nd: int = 2) -> list[str]:
+    """一个数在材料里可能的写法：带千分位和不带千分位。"""
+    return list(dict.fromkeys([f"{x:,.{nd}f}", f"{x:.{nd}f}"]))
 
 
 # ---------------- 16 ----------------
@@ -136,13 +187,15 @@ def q16() -> None:
                  f"目标波动率 10%，波动率仓位 {pc(pos_vol)}。"]),
         ("风险开关", [f"基准日 VIX 收盘 {win.iloc[-1]:.2f}。过去 250 个交易日（{win.index[0]} 至 {win.index[-1]}）里有 {below} 天低于这个水平，占 {pc(share)}，"
                   f"不低于 75%，开关触发，仓位乘 0.8 后为 {pc(pos_sw)}，向下取整到 {pc(pos, 0)}。",
-                  "VIX 通过 US Stocks MCP 查询，代码 ^VIX，查询信息见核定表「风险开关」。"]),
+                  "VIX 日线通过 US Stocks MCP 查询（数据来自 Yahoo Finance，2026-11-18 查询），代码 ^VIX，数据说明见核定表「风险开关」。"]),
         ("各 ETF 占净值权重", ["、".join(f"{t}（{ETF[t][0]}）{pc(w[t] * pos)}" for t in w.index) + f"，现金 {pc(1 - pos)}。"]),
     ])
+    check_visible(ans / "专户11月仓位核定表.xlsx", {"仓位": ["A2", "A3", "A9"], "风险开关": ["A4"]})
 
 
 def read_q16():
-    wb = load_workbook(D17 / "题目附件" / "专户11月仓位核定表.xlsx", data_only=True)
+    """17 的标答按正确的第一轮结果算：直接读 16 的标准答案附件。"""
+    wb = load_workbook(D16 / "标准答案附件" / "专户11月仓位核定表.xlsx", data_only=True)
     pos = {r[0]: r[1] for r in wb["仓位"].iter_rows(min_row=2, values_only=True) if r[0] and r[1] is not None}["核定仓位(%)"] / 100
     wt = {r[0]: r[3] / 100 for r in wb["持仓权重"].iter_rows(min_row=2, values_only=True) if r and r[0] in ETF}
     assert abs(sum(wt.values()) - pos) < 1e-9
@@ -176,7 +229,7 @@ def q17() -> None:
     n_rows = write_prices(att / "回撤回放_A01_行业ETF日线.csv", px[px.index >= START])
     copy_as(DOC / "专户回撤" / "A02_回放口径与交付.md", att / "回撤回放_A02_回放口径与交付.md")
     copy_as(D17 / "MCP结果文件" / mcp, att / mcp)
-    copy_as(D16 / "标准答案附件" / "专户11月仓位核定表.xlsx", att / "专户11月仓位核定表.xlsx")
+    extra = copy_materials("17", att)  # 第一轮的核定表不再放进来，模型用自己上一轮做的
 
     pos0, wt0 = read_q16()
     p = read_prices(att / "回撤回放_A01_行业ETF日线.csv")
@@ -210,6 +263,12 @@ def q17() -> None:
     raw = raw[~raw.index.duplicated(keep="last")].reindex(p.index).ffill().bfill()
     e_dd = replay(rp, raw)[1].min()
     print(f"     错法：汇率按UTC日期配，{pc(fin['pos'], 0)} 档最大回撤 {pc(e_dd)}；期末净值 {nav.iloc[-1]:.6f}")
+    # 补充材料不能写出本题和上一轮的答案：各档回撤、峰谷日、配不到汇率的日子、最终仓位，以及 16 的核定仓位和权重
+    banned = [pc(t["dd"])[1:] for t in tiers] + [pc(-fin["usd"])] + [tiers[0]["peak"], tiers[0]["trough"]] + miss
+    banned += [pc(fin["pos"], 0), pc(pos0, 0), f"{nav.iloc[-1]:.6f}", f"{f[START]:.4f}", f"{f[BASE]:.4f}"]
+    banned += [pc(v) for v in wt0.values()] + [pc(wt0[t] * fin["pos"] / pos0) for t in wt0]
+    check_no_leak(att, extra, list(dict.fromkeys(banned)))
+    assert len(list(att.iterdir())) == 3 + len(extra) and not (att / "专户11月仓位核定表.xlsx").exists()
 
     t_rows = [[round(t["pos"] * 100, 2), round(t["dd"] * 100, 2), t["peak"], t["trough"], "满足" if t["ok"] else "不满足"] for t in tiers]
     d_rows = [[START, "", float(f[START]), 1.0, 0.0]] + [[d, round(float(rp[d]), 8), float(f[d]), round(float(nav[d]), 6), round(float(dd[d]), 6)] for d in rp.index]
@@ -266,7 +325,7 @@ def q18() -> None:
         copy_as(RAW / "行业轮动调仓" / f"{t}.json", D18 / "MCP结果文件" / fn)
         copy_as(D18 / "MCP结果文件" / fn, att / fn)
         mcps[t] = fn
-    copy_as(D17 / "标准答案附件" / "专户回撤回放意见.docx", att / "专户回撤回放意见.docx")
+    extra = copy_materials("18", att)  # 第二轮的回放意见不再放进来，模型用自己上一轮做的
     with open(att / "调仓_A01_11月2日持仓与资金.csv", "w", newline="", encoding="utf-8") as fo:
         wr = csv.writer(fo)
         wr.writerow(["项目", "代码", "名称", "数量", "金额", "币种", "说明"])
@@ -278,7 +337,7 @@ def q18() -> None:
     copy_as(DOC / "专户调仓" / "A02_调仓口径与交付.md", att / "调仓_A02_调仓口径与交付.md")
 
     # ---- 只用附件重算 ----
-    wt = read_q17_weights(att / "专户回撤回放意见.docx")
+    wt = read_q17_weights(D17 / "标准答案附件" / "专户回撤回放意见.docx")  # 按正确的第二轮结果算
     a01 = pd.read_csv(att / "调仓_A01_11月2日持仓与资金.csv", dtype={"代码": str})
     hold = {r["代码"]: int(r["数量"]) for _, r in a01[a01["项目"] == "ETF持仓"].iterrows()}
     cash0 = float(a01[a01["项目"] == "美元现金"]["金额"].iloc[0])
@@ -346,6 +405,16 @@ def q18() -> None:
     nav_nosub = nav - sub_usd
     assert abs(mv0["XLV"] / nav_nosub - wt["XLV"]) > BAND
     print(f"     错法：不加申购款 XLV 现权重 {pc(mv0['XLV'] / nav_nosub, 3)}；按 65% 仓位 XLC 目标 {math.floor(nav * 0.13 / px['XLC'])} 股")
+    # 补充材料不能写出本题的下单股数、限价、换汇金额、测算价、日均量和资金结果，也不能写出上一轮的占净值权重
+    banned = [f"{v:,}" for r in rows for v in (r["tgt"], abs(r["dq"])) if v] + [str(abs(r["dq"])) for r in rows if r["dq"]]
+    banned += [f"{o['q']:,}" for o in orders] + [str(o["q"]) for o in orders] + [f"{o['lim']:.2f}" for o in orders]
+    banned += [f"{px[t]:.2f}" for t in names] + [f"{math.floor(adv[t]):,}" for t in names] + [f"{cap[t]:,}" for t in names]
+    for x in (sub_usd, nav, sells, buys, comm, cash1, nav1, r2(sum(mv0.values()))):
+        banned += num_forms(x)
+    banned += [pc(v) for v in wt.values()] + [pc(1 - sum(wt.values()))]
+    given = {f"{v:,}" for v in hold.values()} | {str(v) for v in hold.values()}  # 清仓股数就是 A01 的持股数，不算泄露
+    check_no_leak(att, extra, [x for x in dict.fromkeys(banned) if x not in given])
+    assert len(list(att.iterdir())) == 2 + len(mcps) + len(extra) and not (att / "专户回撤回放意见.docx").exists()
 
     t_rows = [[r["t"], ETF[r["t"]][0], r["held"], px[r["t"]], mv0[r["t"]], round(r["cw"] * 100, 2), round(r["tw"] * 100, 2), r["tgt"],
                ("是" if r["keep"] else "否") if r["tw"] else "不在名单，清仓", r["new"], round(mv1[r["t"]] / nav1 * 100, 2)] for r in rows]

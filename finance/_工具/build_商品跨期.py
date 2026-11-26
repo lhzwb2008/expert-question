@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """打包「商品跨期品种准入」这道题：题目附件、标准答案附件。
 
-底稿是 high-econ/一期/carry_screen，附件内容没有改，只改了文件名。
+底稿是 high-econ/一期/carry_screen，附件只改了文件名。A03 的文字 2026-11 改过（去掉「本题」字样），
+改后的原稿在 新题口径/商品跨期/，打包时用它代替底稿里的同名文件。
 在线 MCP 查的是上证指数（000001.SS）日线，用来核对 A01 的交易日是否齐全：
 国内商品期货日盘和 A 股用同一份交易日历，各品种的交易日数是覆盖率和大波动日占比的分母。
 
@@ -11,11 +12,14 @@
 """
 from __future__ import annotations
 
+from pathlib import Path
+
 import pandas as pd
 
 from build_common import CASES, OUT, copy_as, fresh_dir, load_mcp_prices, load_module, source_line, write_docx, write_xlsx
 
 SRC = CASES / "一期" / "carry_screen"
+DOC = Path(__file__).resolve().parent / "新题口径" / "商品跨期"  # 改过文字的附件原稿，有同名文件时代替底稿
 DST = OUT / "题目" / "09_商品跨期品种准入"
 PREFIX = "商品跨期_"
 MCP_FILE = f"{PREFIX}MCP_000001.SS日线.json"
@@ -33,7 +37,7 @@ def main() -> None:
     att = fresh_dir(DST / "题目附件")
     ans = fresh_dir(DST / "标准答案附件")
     for old, new in RENAME.items():
-        copy_as(SRC / "attachments" / old, att / f"{PREFIX}{new}")
+        copy_as(DOC / old if (DOC / old).exists() else SRC / "attachments" / old, att / f"{PREFIX}{new}")
     copy_as(DST / "MCP结果文件" / MCP_FILE, att / MCP_FILE)
 
     # 核对 1：重算
@@ -105,7 +109,7 @@ def main() -> None:
                 f"玻璃 FG：只差方向占比，{fg.neg_days}/{fg.big_days} = {fg.share:.6f}，低于 85%。中位数 {fg['median']:+.6f}，绝对值是未纳入品种里最大的，但不能因为曲线陡就纳入。",
             ]),
             ("交易日核对", [
-                f"用 US Stocks MCP 查询了上证指数（000001.SS）日线。评估窗口 {FIRST} 至 {LAST} 上证指数有 {len(idx)} 个交易日，"
+                f"通过 US Stocks MCP 查询上证指数（000001.SS）日线（数据来自 Yahoo Finance，{rec['查询时间'][:10]} 查询）核对。评估窗口 {FIRST} 至 {LAST} 上证指数有 {len(idx)} 个交易日，"
                 "A01 里十八个品种各有 925 个交易日，逐日相同，没有缺失日。",
                 "交易日数是配对覆盖率和大波动日占比的分母，按 925 计算。上证指数只用于核对交易日，不进入期限结构测算。",
             ]),

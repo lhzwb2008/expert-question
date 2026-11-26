@@ -31,6 +31,126 @@ LIM_TOTAL, LIM_ONE = 0.35, 0.10
 GRID = [round(0.5 + 0.1 * i, 1) for i in range(16)]
 
 
+NOTE_SPAN_MAX = 130   # 表下说明合并区的最大宽度（字符宽），约 900 像素，100% 缩放下一屏能看全
+
+
+def disp_width(value) -> float:
+    """按偏宽的口径估计单元格文字占几个字符宽：中文和全角符号 2.2，其余 1.1（macOS 上的中文字体比 Windows 宽）。"""
+    import unicodedata
+    if value is None:
+        return 0.0
+    return sum(2.2 if unicodedata.east_asian_width(ch) in "WF" else 1.1 for ch in str(value))
+
+
+def tidy_layout(path: Path) -> list[str]:
+    """2026-11-26 最终质检：重排四个工作表的列宽、对齐和表下说明，只动格式，不动单元格的值。
+    - 列宽 = 本列最宽的数据 + 3 个字符的间距；表头太长时换行（最多 3 行），表头行加高；
+    - 代码、日期、情景编号这类短字段居中，中文文字列左对齐并缩进 1 格，数字右对齐，相邻两列的文字不再贴在一起；
+    - 表下说明合并到不超过 NOTE_SPAN_MAX 宽的几列里自动换行，按估计的行数设行高。
+    返回每个工作表的「字符宽 vs 列宽」核对记录，并对放不下的单元格报错。"""
+    import math
+    import re
+    from openpyxl import load_workbook
+    from openpyxl.styles import Alignment
+    from openpyxl.utils import get_column_letter
+
+    from build_common import scrub_office
+
+    wb = load_workbook(path)
+    log = []
+    short = re.compile(r"^(S\d|\d{4}-\d{2}-\d{2}|[0-9A-Z.]+|合规|不合规|超限|未超限)$")
+    for ws in wb.worksheets:
+        ncol = ws.max_column
+        notes = [r for r in range(2, ws.max_row + 1) if ws.cell(r, 1).value is not None and all(ws.cell(r, c).value is None for c in range(2, ncol + 1))]
+        last = min(notes) - 2 if notes else ws.max_row
+        for rng in list(ws.merged_cells.ranges):
+            ws.unmerge_cells(str(rng))
+        widths, head_lines = [], []
+        log.append(f"「{ws.title}」表头 1 行、数据 2-{last} 行、说明 {['A' + str(r) for r in notes]}")
+        for c in range(1, ncol + 1):
+            head = ws.cell(1, c).value
+            vals = [ws.cell(r, c).value for r in range(2, last + 1) if ws.cell(r, c).value is not None]
+            data_w = max([disp_width(v) for v in vals] + [0])
+            hw = disp_width(head)
+            width = max(8, math.ceil(data_w) + 3, math.ceil(hw / 3) + 3)
+            lines = math.ceil(hw / (width - 2))
+            ws.column_dimensions[get_column_letter(c)].width = width
+            widths.append(width)
+            head_lines.append(lines)
+            ws.cell(1, c).alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+            text = [v for v in vals if isinstance(v, str)]
+            if text and all(short.match(v) for v in text):
+                al = Alignment(horizontal="center", vertical="center")
+            elif text:
+                al = Alignment(horizontal="left", vertical="center", indent=1)
+            else:
+                al = Alignment(horizontal="right", vertical="center")
+            for r in range(2, last + 1):
+                ws.cell(r, c).alignment = al
+            assert data_w + 2 <= width, (ws.title, c, data_w, width)
+            log.append(f"  {get_column_letter(c)} {head}：列宽 {width}，最宽数据 {data_w:.1f}，表头 {hw:.1f}（{lines} 行），"
+                       f"{'居中' if al.horizontal == 'center' else ('左对齐缩进1' if al.horizontal == 'left' else '右对齐')}")
+        ws.row_dimensions[1].height = 15 * max(head_lines) + 4
+        if ws.cell(1, 2).value == "情景名称":  # 宽表横向滚动时，情景编号和名称留在左边，每列归属一眼可见
+            ws.freeze_panes = "C2"
+        span, span_w = 0, 0
+        for w_ in widths:
+            if span and span_w + w_ > NOTE_SPAN_MAX:
+                break
+            span, span_w = span + 1, span_w + w_
+        for r in notes:
+            text = ws.cell(r, 1).value
+            ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=span)
+            ws.cell(r, 1).alignment = Alignment(horizontal="left", vertical="top", wrap_text=True)
+            lines = math.ceil(disp_width(text) / (span_w - 4))
+            ws.row_dimensions[r].height = 15 * lines + 6
+            log.append(f"  A{r}：合并 A{r}:{get_column_letter(span)}{r}，合并宽 {span_w}，文字 {disp_width(text):.1f}，"
+                       f"换行约 {lines} 行，行高 {ws.row_dimensions[r].height}")
+    wb.save(path)
+    scrub_office(path)
+    return log
+
+
+def check_layout(path: Path) -> list[str]:
+    """重新打开存好的 xlsx，逐个非空单元格核对能否在正常视区看全：
+    不换行的单元格，字符宽 + 2 ≤ 列宽；换行的单元格（表头、合并的说明），按所在宽度估计的行数 × 15 ≤ 行高。"""
+    import math
+    from openpyxl import load_workbook
+    from openpyxl.utils import get_column_letter
+
+    wb = load_workbook(path)
+    out = []
+    for ws in wb.worksheets:
+        merged = {r.min_row: r for r in ws.merged_cells.ranges}
+        n_cells, worst = 0, 0.0
+        for row in ws.iter_rows():
+            for c in row:
+                if c.value is None:
+                    continue
+                n_cells += 1
+                rng = merged.get(c.row) if c.column == 1 else None
+                if rng is not None:
+                    width = sum(ws.column_dimensions[get_column_letter(k)].width for k in range(rng.min_col, rng.max_col + 1))
+                else:
+                    width = ws.column_dimensions[c.column_letter].width
+                w = disp_width(c.value)
+                if c.alignment.wrap_text:
+                    need = 15 * math.ceil(w / (width - 4 if rng is not None else width - 2))
+                    height = ws.row_dimensions[c.row].height
+                    assert height is not None and need <= height, (ws.title, c.coordinate, w, width, need, height)
+                    worst = max(worst, need / height)
+                else:
+                    assert w + 2 <= width, (ws.title, c.coordinate, c.value, w, width)
+                    worst = max(worst, (w + 2) / width)
+                if rng is not None:
+                    out.append(f"  「{ws.title}」{c.coordinate} 合并 {rng.coord}，宽 {width:.0f}，自动换行，行高 {ws.row_dimensions[c.row].height}，"
+                               f"文字 {w:.1f} 字符宽")
+        total = sum(ws.column_dimensions[get_column_letter(k)].width for k in range(1, ws.max_column + 1))
+        out.append(f"  「{ws.title}」{n_cells} 个非空单元格全部放得下（占用最满的一格 {worst:.0%}），表格总宽 {total:.0f}，"
+                   f"列宽 " + " ".join(f"{get_column_letter(k)}={ws.column_dimensions[get_column_letter(k)].width:g}" for k in range(1, ws.max_column + 1)))
+    return out
+
+
 def at(series: pd.Series, day: str):
     s = series[series.index <= day]
     return s.index[-1], float(s.iloc[-1])
@@ -173,6 +293,11 @@ def main() -> None:
             ],
         },
     )
+    for line in tidy_layout(ans / "多资产压力测试测算表.xlsx"):
+        print(line)
+    print("回读核对版面：")
+    for line in check_layout(ans / "多资产压力测试测算表.xlsx"):
+        print(line)
     hs4 = cell["S4", "HSI"]
     write_docx(
         ans / "多资产压力测试与敞口倍数建议.docx",
@@ -192,7 +317,7 @@ def main() -> None:
             ]),
             ("六个情景的组合收益", ["倍数为 1 时：" + "；".join(f"{sc}（{sname[sc]}）{R[sc] * 100:+.2f}%" for sc in R) + "。"]),
             ("在线数据", [
-                "研究部的快照 A01 没有收录恒生指数。恒生指数日线通过 US Stocks MCP 查询，代码 ^HSI。返回的日期是 UTC 时间，加 8 小时后才是香港的交易日。",
+                "研究部的快照 A01 没有收录恒生指数。恒生指数日线通过 US Stocks MCP 查询（数据来自 Yahoo Finance，2026-11-11 查询），代码 ^HSI，日期按香港交易日归属。",
                 "各资产只用自己的交易日，起点、终点当天休市时取之前最近一个交易日。" + shift_txt + "。",
             ]),
             ("对应材料", ["36 个情景涨跌幅见《多资产压力测试测算表.xlsx》的「情景涨跌幅」，六个情景的限额检查见「限额检查」，各档倍数的结果见「各档倍数」，"

@@ -2,7 +2,8 @@
 """打包「多策略稳健1号」雪球凭证的三道题（19 存续排查 → 20 报价回测比选 → 21 认购额度与期初要素）。
 
 20 读 19 的标准答案《存续雪球凭证排查表.xlsx》，21 读 19 的排查表和 20 的《11月雪球报价回测表.xlsx》。
-前一轮定稿的成果原样复制进后一轮的题目附件，后一轮只从自己的附件里读。
+2026-11-26 返修起前轮标答不再放进后一轮的题目附件，后一轮直接读前轮标准答案附件计算；题目附件里的 B 系列背景材料
+由 补充材料/19|20|21/生成补充材料.py 生成，这里原样复制，并用 leak_check 检查不含本题和前轮要算的关键数字。
 
 中证500ETF 的不复权日线是 fetch_longport.py 拉的内部快照；中证1000ETF 和十年回测用的日线、起始日收盘价
 都是 fetch_新题.py 通过 US Stocks MCP 查回来的。台账、报价、估值表、券商额度和各条门槛是按题目需要拟的。
@@ -19,7 +20,7 @@ from pathlib import Path
 import pandas as pd
 from openpyxl import load_workbook
 
-from build_common import OUT, copy_as, fresh_dir, load_mcp_prices, source_line, write_docx, write_xlsx
+from build_common import OUT, copy_as, copy_materials, fresh_dir, load_mcp_prices, source_line, write_docx, write_xlsx
 
 HERE = Path(__file__).resolve().parent
 RAW = HERE / "新题数据"
@@ -79,6 +80,53 @@ def level(ko, step, floor, k):
 def ledger_rows():
     return [dict(code=n[0], iss=n[1], und=n[2], kind=n[3], ko=n[4], step=n[5], floor=n[6], ki=n[7], cpn=n[8], start=n[9], amt=n[10])
             for n in NOTES]
+
+
+# ========== 2026-11-26 最终质检返修：补充的背景、历史和版本材料 ==========
+# B 系列材料由 补充材料/19|20|21/生成补充材料.py 生成（共用 补充材料/19/雪球公共.py），生成结果提交在各目录里，
+# 这里用 copy_materials 原样复制进题目附件，打包不联网。行情是真实数据（LongPort、US Stocks MCP），人员和往来是拟的。
+# 下面的 leak_check 在每题算完标准答案后检查 B 系列材料，不能出现本题和前轮要算的关键数字、结论和逐张状态。
+def _att_text(p: Path) -> str:
+    import re
+    import zipfile
+    if p.suffix in (".md", ".csv"):
+        return p.read_text(encoding="utf-8")
+    with zipfile.ZipFile(p) as z:
+        if p.suffix == ".docx":
+            return re.sub(r"<[^>]+>", "", z.read("word/document.xml").decode().replace("</w:p>", "\n"))
+        return "\n".join(re.sub(r"<[^>]+>", " ", z.read(n).decode()) for n in z.namelist()
+                         if n.startswith(("xl/sharedStrings", "xl/worksheets/sheet")))
+
+
+def lit(*vals: str) -> str:
+    """几个字面值的正则，前后不能紧挨数字（前面也不能是小数点或千分位逗号）。"""
+    import re
+    return r"(?<![\d.,])(?:" + "|".join(re.escape(v) for v in vals) + r")(?![\d])"
+
+
+def wan(x: float, nd: int = 2) -> str:
+    """金额的两种写法：带千分位和不带。"""
+    return lit(f"{x:,.{nd}f}", f"{x:.{nd}f}") if nd else lit(f"{x:,.0f}", f"{x:.0f}")
+
+
+def leak_check(att: Path, pats: list[tuple[str, str]], skip_in: dict[str, str] | None = None) -> None:
+    """pats: [(说明, 正则)]，说明以「~」开头的只查 md、docx 正文。
+    skip_in: {说明: 文件名关键词}，该项不查文件名含关键词的材料（如观察日历本来就列观察日）。"""
+    import re
+    bad = []
+    for p in sorted(att.iterdir()):
+        if not re.search(r"_B\d", p.name):
+            continue
+        t = _att_text(p)
+        for why, rx in pats:
+            if skip_in and why in skip_in and skip_in[why] in p.name:
+                continue
+            if why.startswith("~") and p.suffix not in (".md", ".docx"):  # 只查正文：表格里的行情数字容易撞上短小数
+                continue
+            m = re.search(rx, t)
+            if m:
+                bad.append(f"{p.name}：{why}「{t[max(0, m.start() - 12):m.end() + 12]}」")
+    assert not bad, "B 系列材料泄露关键数字：\n" + "\n".join(bad)
 
 
 # ---------------- 19 ----------------
@@ -142,6 +190,7 @@ def q19():
         for a, b, v in DIV500:
             wr.writerow([a, b, f"{v:.3f}"])
     copy_as(DOC / "雪球排查" / "A04_排查口径与交付.md", att / "排查_A04_排查口径与交付.md")
+    mats19 = copy_materials("19", att)  # 最终质检返修补充的背景、历史和版本材料（排查_B01~B16）
     raw500 = lp.set_index("date").close.astype(float)
     led = ledger_rows()
     lp1000 = pd.DataFrame(json.load(open(LP / "512100.SH_noadj.json", encoding="utf-8"))).set_index("date").close.astype(float)
@@ -216,6 +265,28 @@ def q19():
     for n in res:  # 每个判断离门槛至少 2 个最小价位
         assert n["o"]["gap_ko"] >= 0.002 and n["o"]["gap_ki"] >= 0.002, n["code"]
 
+    # B 系列材料不能出现本题要算的关键数字、结论和逐张状态（历史期间的数字可以有）
+    pats19 = [("存续名义本金", wan(tot, 0)), ("已敲入名义本金", lit(f"{ki_amt:,}万", f"{ki_amt}万")), ("敲入占比", lit(f"{ratio * 100:.2f}")),
+              ("潜在亏损合计", wan(loss)), ("错法敲入占比", lit(f"{w_ratio * 100:.2f}"))]
+    for n in res:
+        o = n["o"]
+        pats19.append((f"{n['code']} 状态", rf"{n['code']}[^。\n|]{{0,20}}(已敲出|已敲入|存续未敲入|存续已敲入|未敲入|敲出于|敲入于)"))
+        if n["ko_amt"] is not None:
+            pats19.append((f"{n['code']} 敲出收益", wan(n["ko_amt"])))
+        if n["loss"]:
+            pats19.append((f"{n['code']} 潜在亏损", wan(n["loss"])))
+        if o["ko"]:
+            pats19.append(("敲出日", lit(o["ko"])))
+        if o["ki"] and o["ki"][0] != BASE:
+            pats19.append(("敲入日", lit(o["ki"][0])))
+        if abs(o["fac"] - 1) > 1e-12:
+            pats19.append(("除息调整系数", lit(f"{o['fac']:.6f}", f"{o['fac']:.5f}")))
+        if not o["ko"]:
+            pats19.append((f"{n['code']} 当前敲入价格", lit(f"{o['kip']:.4f}")))
+        if n["o0"]["ki"]:
+            pats19.append((f"{n['code']} 不调整时的敲入价格", lit(f"{n['o0']['ki'][2]:.4f}")))
+    leak_check(att, pats19, skip_in={"敲出日": "观察日历"})
+
     s_rows = []
     for n in res:
         o = n["o"]
@@ -273,10 +344,10 @@ def q19():
                 res[6]["o"]["kip"], res[6]["o"]["ki"][0], res[6]["o"]["ki"][1], res[6]["o0"]["ki"][2], res[6]["o0"]["ki"][0])]),
         ("存续分布", ["按挂钩标的：" + "，".join(f"{NAME[u]} {by_und[u]:,} 万元" for u in NAME) + "。",
                   "按发行人：" + "，".join(f"{i} {by_iss[i]:,} 万元" for i in issuers if by_iss[i]) + "。"]),
-        ("数据", ["中证500ETF 用内部行情快照和除息记录。中证1000ETF 通过 US Stocks MCP 查询，代码 512100.SS，返回的是前复权价，"
-                "按 Dividends 列还原成不复权价后和台账期初价格一致；在线数据缺 " + "、".join(miss) + "，不影响任何凭证。"]),
+        ("数据", ["中证500ETF 用内部行情快照和除息记录。中证1000ETF 日线通过 US Stocks MCP 查询（数据来自 Yahoo Finance，2026-11-19 查询），代码 512100.SS，该数据源是前复权价，"
+                "按分红记录还原成不复权价后和台账期初价格一致；在线数据缺 " + "、".join(miss) + "，不影响任何凭证。"]),
     ])
-    return dict(res=res, ratio=ratio, tot=tot, by_und=by_und, by_iss=by_iss)
+    return dict(res=res, ratio=ratio, tot=tot, by_und=by_und, by_iss=by_iss, pats=pats19)
 
 
 # ---------------- 20 ----------------
@@ -323,7 +394,7 @@ def quote_rows():
     return [dict(id=q[0], iss=q[1], und=q[2], kind=q[3], ko=q[4], step=q[5], floor=q[6], ki=q[7], cpn=q[8]) for q in QUOTES]
 
 
-def q20():
+def q20(pats19: list[tuple[str, str]] | None = None):
     att, ans = fresh_dir(D20 / "题目附件"), fresh_dir(D20 / "标准答案附件")
     (D20 / "MCP结果文件").mkdir(exist_ok=True)
     mcps = {"510500": "比选_MCP_中证500ETF十年日线.json", "512100": "比选_MCP_中证1000ETF十年日线.json"}
@@ -338,18 +409,20 @@ def q20():
             wr.writerow([q["id"], q["iss"], q["und"], NAME[q["und"]], q["kind"], NEW, TENOR, LOCK, pc(q["ko"], 0), pc(q["step"], 1),
                          pc(q["floor"], 0), pc(q["ki"], 0), pc(q["cpn"], 1), BASE])
     copy_as(DOC / "雪球比选" / "A02_回测口径与入选规则.md", att / "比选_A02_回测口径与入选规则.md")
-    copy_as(D19 / "标准答案附件" / "存续雪球凭证排查表.xlsx", att / "存续雪球凭证排查表.xlsx")
+    mats20 = copy_materials("20", att)  # 最终质检返修补充的背景、历史和版本材料（比选_B01~B17）
 
-    r19 = read_q19(att / "存续雪球凭证排查表.xlsx")
+    # 前轮标答不再放进本题题目附件：直接读第一轮标准答案附件里的排查表（见「去掉前轮标答」）
+    r19 = read_q19(D19 / "标准答案附件" / "存续雪球凭证排查表.xlsx")
     th = TH_HIGH if r19["ratio"] > KI_LINE else TH_LOW
     pq = pd.read_csv(att / "比选_A01_11月雪球报价.csv", dtype=str)
     pct = lambda s: float(s.rstrip("%")) / 100
     qs = [dict(id=r["报价编号"], iss=r["发行人"], und=r["挂钩标的代码"], kind=r["结构"], ko=pct(r["敲出水平"]), step=pct(r["每月降幅"]),
                floor=pct(r["敲出水平下限"]), ki=pct(r["敲入水平"]), cpn=pct(r["年化票息"])) for _, r in pq.iterrows()]
-    recs, pxs, full = {}, {}, {}
+    recs, pxs, full, raw_info = {}, {}, {}, {}
     for u, f in mcps.items():
-        rec, d = load_mcp_prices(att / f, 8)
-        d = d[d.Close.notna()]
+        rec, draw = load_mcp_prices(att / f, 8)
+        raw_info[u] = (len(draw), draw.index[0], draw.index[-1])  # 原始返回行数（含末行空收盘价）、起止日
+        d = draw[draw.Close.notna()]
         recs[u], full[u] = (rec, d), d.Close.round(4)
         pxs[u] = full[u][full[u].index <= BASE]
     for q in qs:
@@ -365,6 +438,20 @@ def q20():
     assert [q["id"] for q in sel] == ["Q6", "Q4", "Q3", "Q5"]
     assert all(abs(q["kil"] - th) > 0.01 for q in qs)
     assert all(sel[i]["ann"] - sel[i + 1]["ann"] > 0.002 for i in range(len(sel) - 1))
+    # B 系列材料不能出现本题的门槛档位、回测统计和入选排序，也不能出现第一轮的存续结论
+    pats20 = [("存续敲入占比", lit(f"{r19['ratio'] * 100:.2f}")), ("存续名义本金", wan(r19["tot"], 0)),
+              ("入选排序", r"Q6\W{0,4}Q4\W{0,4}Q3\W{0,4}Q5"), ("本月门槛", r"(本月|本批|11月)[^。\n]{0,8}门槛[^。\n]{0,6}(15|8)%"),
+              ("起始日数量", lit(f"{qs[0]['n']}", f"{qs[0]['n']:,}")), ("回测交易日数", lit(f"{len(pxs['510500'])}", f"{len(pxs['510500']):,}"))]
+    for q in qs:
+        for k in ("ko_s", "mat", "kil", "ann"):
+            if q[k] > 0.001:
+                pats20.append((f"~{q['id']} {k}", lit(f"{q[k] * 100:.2f}%", f"{q[k] * 100:.2f} %")))
+        pats20.append((f"~{q['id']} 平均持有天数", lit(f"{q['days']:.1f}")))
+        if not q["ok"]:
+            pats20.append((f"{q['id']} 超出门槛", lit(f"{(q['kil'] - th) * 100:.2f}个百分点", f"{(q['kil'] - th) * 100:.2f} 个百分点")))
+    leak_check(att, pats20)
+    if pats19:  # 20 的 B 系列也不能出现第一轮的逐张状态、金额和价格（单独的日期常与会议日期重合，不查）
+        leak_check(att, [x for x in pats19 if x[0] not in ("敲出日", "敲入日")])
     # 错法：门槛用 8%；回测不截到基准日
     print("     错法：门槛 8% 入选", [q["id"] for q in sorted([q for q in qs if q["kil"] <= TH_HIGH], key=lambda q: -q["ann"])])
     for q in qs[:1]:
@@ -380,19 +467,23 @@ def q20():
     o_rows = []
     for u, (rec, d) in recs.items():
         q = rec["参数"]
+        raw_n, raw_first, raw_last = raw_info[u]
         o_rows.append([f"{u} {NAME[u]}", q["ticker"], rec["工具"], f"period={q['period']}, interval={q['interval']}", rec["查询时间"],
-                       len(d), d.index[0], d.index[-1], len(pxs[u]), pxs[u].index[0], pxs[u].index[-1]])
+                       raw_n, raw_first, raw_last, len(d), len(pxs[u]), pxs[u].index[0], pxs[u].index[-1]])
+    assert all(r[5] == 2425 and r[7] == "2026-11-18" and r[8] == 2424 for r in o_rows)  # 原始返回 2425 行、截至 2026-11-18；非空收盘价 2424 条
     n0 = qs[0]
     write_xlsx(ans / "11月雪球报价回测表.xlsx",
                [("回测结果", ["报价编号", "发行人", "挂钩标的", "结构", "敲出水平(%)", "每月降幅(%)", "敲出水平下限(%)", "敲入水平(%)", "年化票息(%)",
                           "起始日数量", "第一个起始日", "最后一个起始日", "敲出比例(%)", "到期未敲入比例(%)", "敲入亏损比例(%)", "平均持有自然日", "平均年化收益率(%)"], b_rows),
                 ("入选排序", ["排序", "报价编号", "发行人", "挂钩标的", "敲入亏损比例(%)", "平均年化收益率(%)", "是否入选", "备注"], r_rows),
-                ("在线数据", ["挂钩标的", "代码", "工具", "参数", "查询时间", "返回行数", "返回第一天", "返回最后一天", "回测用行数", "回测用第一天", "回测用最后一天"], o_rows)],
+                ("在线数据", ["挂钩标的", "代码", "工具", "参数", "查询时间", "原始返回行数", "返回第一天", "返回最后一天", "非空收盘价行数", "回测用行数", "回测用第一天", "回测用最后一天"], o_rows)],
                notes={"回测结果": [f"每个交易日开一张 24 个月的凭证，到期日不晚于 {BASE}，两只 ETF 各 {n0['n']} 个起始日，{n0['first']} 至 {n0['last']}。",
                                "收盘价用在线返回的按分红调整价格，保留 4 位小数。年化收益率是各张凭证年化收益率的算术平均。"],
                       "入选排序": [f"存续敲入占比 {pc(r19['ratio'])}（10月末存续排查表），不超过 50%，敲入亏损比例门槛 {pc(th, 0)}。",
                                "入选的按平均年化收益率从高到低排，这个顺序就是 11 月认购额度的分配顺序。"],
-                      "在线数据": [source_line(recs[u][0]) for u in recs] + ["Date 是 UTC 16:00，加 8 小时后的日期是交易日。最后一行收盘价为空，不用。"]})
+                      "在线数据": [source_line(recs[u][0]) for u in recs]
+                               + ["Date 是 UTC 16:00，加 8 小时后的日期是交易日。原始返回各 2425 行，截至 2026-11-18；末行（2026-11-18）Close 为空，未参与回测，"
+                                  "可用的非空收盘价各 2424 条，截至 2026-11-17。回测按 A02 截到 2026-10-30，各 2412 个交易日。"]})
     write_docx(ans / "11月雪球报价比选意见.docx", "多策略稳健1号 11月新增雪球凭证报价比选意见", [
         ("结论", [f"6 份报价，{len(sel)} 份入选，按平均年化收益率排序：" + "、".join(f"{q['id']}（{q['iss']}）" for q in sel) + "。"
                 + "、".join(f"{q['id']}（{q['iss']}）" for q in out) + "没有入选。"]),
@@ -401,7 +492,7 @@ def q20():
                    f"敲入亏损比例 {pc(q['kil'])}，平均持有 {q['days']:.1f} 天，平均年化收益率 {pc(q['ann'])}。" for i, q in enumerate(sel)]),
         ("没有入选的", [f"{q['id']} {q['iss']}，{NAME[q['und']]}，{q['kind']}，票息 {pc(q['cpn'], 1)}。平均年化收益率 {pc(q['ann'])}，"
                     f"但敲入亏损比例 {pc(q['kil'])}，超出门槛 {(q['kil'] - th) * 100:.2f} 个百分点。" for q in out]),
-        ("回测范围", [f"两只 ETF 的十年日线通过 US Stocks MCP 查询，用按分红调整过的收盘价，回测截止 {BASE}。"
+        ("回测范围", [f"两只 ETF 的十年日线通过 US Stocks MCP 查询（数据来自 Yahoo Finance，2026-11-19 查询），用按分红调整过的收盘价，回测截止 {BASE}。"
                   f"到期日不晚于 {BASE} 的起始日各 {n0['n']} 个，{n0['first']} 至 {n0['last']}。"]),
     ])
     return dict(qs=qs, sel=sel, out=out, th=th, r19=r19)
@@ -459,12 +550,11 @@ def q21(r19_check: dict, r20_check: dict):
         for q in quote_rows():
             wr.writerow([q["id"], q["iss"], "2026-10-30", CAP[q["id"]], "起始日 2026-11-02，当日 15:00 前缴款"])
     copy_as(DOC / "雪球认购" / "A03_限额与认购口径.md", att / "认购_A03_限额与认购口径.md")
-    copy_as(D19 / "标准答案附件" / "存续雪球凭证排查表.xlsx", att / "存续雪球凭证排查表.xlsx")
-    copy_as(D20 / "标准答案附件" / "11月雪球报价回测表.xlsx", att / "11月雪球报价回测表.xlsx")
+    mats21 = copy_materials("21", att)  # 最终质检返修补充的背景、历史和版本材料（认购_B01~B16）
 
-    # 只用附件算
-    r19 = read_q19(att / "存续雪球凭证排查表.xlsx")
-    order = read_q20(att / "11月雪球报价回测表.xlsx")
+    # 前轮标答不再放进本题题目附件：直接读前两轮标准答案附件里的成果（见「去掉前轮标答」）
+    r19 = read_q19(D19 / "标准答案附件" / "存续雪球凭证排查表.xlsx")
+    order = read_q20(D20 / "标准答案附件" / "11月雪球报价回测表.xlsx")
     assert r19["tot"] == r19_check["tot"] and order == [q["id"] for q in r20_check["sel"]]
     a01 = pd.read_csv(att / "认购_A01_估值表摘要.csv", dtype=str)
     val = {r["科目代码"]: float(r["市值(元)"]) for _, r in a01.iterrows() if isinstance(r["科目代码"], str)}
@@ -512,6 +602,25 @@ def q21(r19_check: dict, r20_check: dict):
     print("     错法：不扣应付赎回款", [(a["q"]["id"], a["amt"]) for a in w1], sum(a["amt"] for a in w1))
     w2_, _ = allocate(cash - redeem + val["120202"] / 1e4)
     print("     错法：GC007 算现金", [(a["q"]["id"], a["amt"]) for a in w2_])
+    # B 系列材料不能出现本题的认购方案、额度测算和起始日价格，也不能出现前两轮的结论
+    pats21 = [("存续名义本金", wan(r19["tot"], 0)), ("存续敲入占比", lit(f"{r19['ratio'] * 100:.2f}")),
+              ("入选排序", r"Q6\W{0,4}Q4\W{0,4}Q3\W{0,4}Q5"), ("认购合计", wan(total, 0)), ("错法合计", wan(sum(a["amt"] for a in w1), 0)),
+              ("认购后雪球合计", wan(after["tot"], 0)), ("认购后现金", wan(after["cash"])), ("现金类资产", wan(cash)),
+              ("扣赎回后现金", wan(cash - redeem)), ("起始日 Date 行", lit("2026-11-01T16")),
+              ("~认购后雪球占比", lit(pc(after["tot"] / nav))), ("~认购后现金占比", lit(pc(after["cash"] / nav)))]
+    pats21 += [(f"限额金额 {k}", wan(v)) for k, v in lim.items()]
+    pats21 += [(f"认购后 {u}", wan(v, 0)) for u, v in after["und"].items()] + [(f"~认购后 {u} 占比", lit(pc(v / nav))) for u, v in after["und"].items()]
+    pats21 += [(f"~认购后 {i} 占比", lit(pc(v / nav))) for i, v in after["iss"].items() if v != r19["iss"].get(i)]
+    for a in alloc:
+        pats21 += [(f"{a['q']['id']} 剩余", wan(x)) for x in a["room"][1:]]
+        if a["take"] and a["amt"] not in cap.values():
+            pats21.append((f"{a['q']['id']} 认购金额", lit(f"{a['amt']:,}万", f"{a['amt']}万", f"{a['amt']:,} 万", f"{a['amt']} 万")))
+    for u, v in s0.items():
+        pats21.append((f"~{u} 起始日收盘价", lit(f"{v:.3f}")))
+        pats21 += [(f"{u} 期初要素", lit(f"{v * k:.4f}")) for k in {pq[q]["ki"] for q in pq if pq[q]["und"] == u}
+                   | {pq[q]["ko"] for q in pq if pq[q]["und"] == u} | {pq[q]["floor"] for q in pq if pq[q]["und"] == u}]
+    leak_check(att, pats21)
+    leak_check(D20 / "题目附件", pats21)  # 20 的 B 系列也不能出现第三轮的认购方案和额度测算
     print("     错法：UTC 日期当交易日", {u: float(recs[u][1].Close["2026-11-03"]) for u in recs}, "；用 10-30 收盘", {u: float(recs[u][1].Close[BASE]) for u in recs})
 
     a_rows = [[i + 1, a["q"]["id"], a["q"]["iss"], f"{a['q']['und']} {NAME[a['q']['und']]}"] + [round(x, 2) for x in a["room"]]
@@ -547,6 +656,14 @@ def q21(r19_check: dict, r20_check: dict):
                       "认购后限额": ["认购前的数用 10 月末存续排查表「存续汇总」，按名义本金，不含已敲出的凭证。"],
                       "期初要素": ["价格保留 4 位小数。第 3 个月是第一个观察月。"],
                       "在线数据": [source_line(recs[u][0]) for u in NAME] + ["Date 是 UTC 16:00，加 8 小时后的日期才是交易日，起始日对应的是 2026-11-01T16:00Z 这一行。"]})
+    # 认购后各发行人逐项，和方案表「认购后限额」核对后写进方案正文（质检要求补齐招商、中信、华泰、中金）
+    wb_chk = load_workbook(ans / "11月雪球认购方案表.xlsx", data_only=True)
+    xlsx_iss = {str(r[0]).replace("发行人 ", ""): (r[3], r[4]) for r in wb_chk["认购后限额"].iter_rows(min_row=2, values_only=True)
+                if r[0] and str(r[0]).startswith("发行人 ")}
+    for i, v in after["iss"].items():
+        assert xlsx_iss[i] == (v, round(v / nav * 100, 2)), (i, xlsx_iss.get(i), v)
+    iss_after = sorted(after["iss"].items(), key=lambda kv: (-kv[1], list(after["iss"]).index(kv[0])))
+    iss_txt = "发行人认购后名义本金：" + "，".join(f"{i} {v:,} 万元（{pc(v / nav)}）" for i, v in iss_after) + "，都不超过同一发行人 6% 限额。"
     write_docx(ans / "11月雪球认购方案.docx", "多策略稳健1号 11月雪球凭证认购方案", [
         ("结论", [f"11 月 2 日认购 {len(buy)} 笔，合计 {total:,} 万元：" + "，".join(f"{a['q']['id']} {a['q']['iss']} {a['amt']:,} 万元" for a in buy) + "。"
                 + "、".join(f"{a['q']['id']} {a['q']['iss']}" for a in alloc if not a["take"]) + "这次不认购。"]),
@@ -557,16 +674,15 @@ def q21(r19_check: dict, r20_check: dict):
                      for a in alloc]),
         ("认购后", [f"雪球凭证名义本金 {after['tot']:,} 万元，占净值 {pc(after['tot'] / nav)}。"
                  + "，".join(f"{NAME[u]} {after['und'][u]:,} 万元（{pc(after['und'][u] / nav)}）" for u in NAME) + "。",
-                 "发行人里最高的是" + "、".join(i for i in after["iss"] if after["iss"][i] == max(after["iss"].values()))
-                 + f"，各 {max(after['iss'].values()):,} 万元（{pc(max(after['iss'].values()) / nav)}）。",
+                 iss_txt,
                  f"现金类资产扣应付赎回款后 {w2(after['cash'])} 万元，占净值 {pc(after['cash'] / nav)}。各项都在限额内。"]),
         ("期初要素", [f"{r[0]} {r[1]}，{NAME[r[2][:6]]}，期初价格 {r[6]:.3f} 元，敲入价格 {r[7]:.4f} 元，第 3 个月敲出价格 {r[8]:.4f} 元"
                    + (f"，最低敲出价格 {r[9]:.4f} 元。" if r[9] != "" else "。") for r in e_rows]
-         + [f"期初价格是 {NEW} 的收盘价，通过 US Stocks MCP 查询：中证500ETF {s0['510500']:.3f} 元，中证1000ETF {s0['512100']:.3f} 元。"]),
+         + [f"期初价格是 {NEW} 的收盘价，通过 US Stocks MCP 查询（数据来自 Yahoo Finance，2026-11-19 查询）：中证500ETF {s0['510500']:.3f} 元，中证1000ETF {s0['512100']:.3f} 元。"]),
     ])
 
 
 if __name__ == "__main__":
     r19 = q19()
-    r20 = q20()
+    r20 = q20(r19["pats"])
     q21(r19, r20)

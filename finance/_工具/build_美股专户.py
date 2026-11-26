@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """打包「全球科技成长一号」美元专户的两道题（24 估值对账 → 25 业绩报酬计提）。
-25 读 24 的标准答案《专户估值对账表.xlsx》「净值汇总」，这份表原样复制进 25 的题目附件。
+25 的标准答案直接用 24 的计算结果（重建资产净值），并和 24 标准答案《专户估值对账表.xlsx》「净值汇总」核对；
+2026-11-26 最终质检返修起，25 的题目附件不再放 24 的标答，模型用自己在上一轮完成的对账表。
+两题的补充材料（背景、历史和版本材料）在 _工具/补充材料/24、25/，由各自目录里的生成脚本生成，这里原样复制。
 美股不复权日线是 fetch_longport.py 拉的内部快照；拆股、分红和 QQQ 是 fetch_新题.py 通过 US Stocks MCP 查的。
 持仓、交易流水、付息日、管理人估值表、托管行对账单、份额登记和初算是按题目需要拟的。
 """
@@ -14,7 +16,8 @@ from pathlib import Path
 import pandas as pd
 from openpyxl import load_workbook
 
-from build_common import OUT, copy_as, fresh_dir, load_mcp_prices, source_line, write_docx, write_xlsx
+from build_common import OUT, copy_as, copy_materials, fresh_dir, load_mcp_prices, scrub_office, source_line, write_docx, write_xlsx
+from openpyxl.styles import Alignment
 
 HERE = Path(__file__).resolve().parent
 RAW = HERE / "新题数据"
@@ -140,6 +143,8 @@ def rebuild(px, splits, divs, mode="ok", until=BASE):
 def q24():
     att, ans = fresh_dir(D24 / "题目附件"), fresh_dir(D24 / "标准答案附件")
     (D24 / "MCP结果文件").mkdir(exist_ok=True)
+    extra = copy_materials("24", att)
+    assert len(extra) >= 6, extra
     files = {}
     for t in TS:
         fn = f"对账_MCP_{t}日线.json"
@@ -245,7 +250,7 @@ def q24():
               ["资产净值", nav_ok, nav_sys, nav_cus],
               ["和重建的差", 0.0, r2(nav_sys - nav_ok), r2(nav_cus - nav_ok)],
               ["差错率(%)", "", round(err * 100, 2), round((nav_cus - nav_ok) / nav_ok * 100, 2)],
-              ["处理级别", "", "达到 0.25%，未到 0.50%：更正估值，通报托管行，报告监管，不公告", "托管行补记应收股利和应收退税"]]
+              ["处理级别", "", "达到 0.25%，未到 0.50%：\n更正估值，通报托管行，报告监管，不公告", "托管行补记应收股利和应收退税"]]
     o_rows = []
     for t in TS:
         for d, k in [splits[t]] if t in splits else []:
@@ -266,6 +271,16 @@ def q24():
                                "CSCO 四次分红托管行按 30% 扣税，按税收协定应扣 10%，多扣的记应收退税。"],
                       "净值汇总": [f"差错率 = (管理人 − 重建) ÷ 重建 = {pc(err)}。下一步算业绩报酬用重建资产净值 {w2(nav_ok)} 美元。"],
                       "在线数据": [source_line(recs[t]) for t in TS] + ["美股 Date 是美东零点对应的 UTC 时间，日期部分就是交易日。"]})
+    # 「净值汇总」C9、D9 两类处理意见各自换行显示，不用点进单元格（2026-11-26 最终质检意见）
+    xp = ans / "专户估值对账表.xlsx"
+    wb = load_workbook(xp)
+    ws = wb["净值汇总"]
+    assert ws["A9"].value == "处理级别"
+    for c in ("C9", "D9"):
+        ws[c].alignment = Alignment(vertical="top", wrap_text=True)
+    ws.row_dimensions[9].height = max(ws.row_dimensions[9].height or 0, 30)
+    wb.save(xp)
+    scrub_office(xp)
     write_docx(ans / "专户估值对账报告.docx", "全球科技成长一号 2026-10-30 估值对账报告", [
         ("结论", [f"重建的 2026-10-30 资产净值是 {w2(nav_ok)} 美元。管理人新系统估值表是 {w2(nav_sys)} 美元，多估 {w2(nav_sys - nav_ok)} 美元，差错率 {pc(err)}；"
                 "达到 0.25%、没到 0.50%，要更正估值、通报托管行并报告监管，不需要对外公告。",
@@ -279,8 +294,8 @@ def q24():
         ("托管行的问题", [f"CSCO 2026-01-02、04-02、07-06、10-02 四次分红按 30% 扣税，按税收协定应扣 10%，合计多扣 {w2(ok['refund'])} 美元。"
                       "托管行要补记应收退税，并办理退税申请。"]),
         ("应收股利", [f"TXN 2026-10-30 除息，10-30 还没到账，税后 {w2(rec_ok)} 美元记应收股利。2025-10-31 除息的那笔期初已经记过，11-11 到账，不能重复算。"]),
-        ("数据", ["行情用内部快照的不复权收盘价。拆股、分红通过 US Stocks MCP 的 get_historical_stock_prices 查询 8 只股票近两年的数据，"
-                "取 Stock Splits 和 Dividends 两列；拆股前的分红金额按拆股比例还原后和托管行入账一致。"]),
+        ("数据", ["行情用内部快照的不复权收盘价。拆股、分红通过 US Stocks MCP 查询 8 只股票近两年的公司行为记录（数据来自 Yahoo Finance，2026-11-19 查询）；"
+                "拆股前的分红金额按拆股比例还原后和托管行入账一致。"]),
     ])
     return dict(nav=nav_ok, nav_sys=nav_sys, ok=ok, px=px, err=err)
 
@@ -289,7 +304,8 @@ def q24():
 def q25(r24):
     att, ans = fresh_dir(D25 / "题目附件"), fresh_dir(D25 / "标准答案附件")
     (D25 / "MCP结果文件").mkdir(exist_ok=True)
-    copy_as(D24 / "标准答案附件" / "专户估值对账表.xlsx", att / "专户估值对账表.xlsx")
+    extra = copy_materials("25", att)
+    assert len(extra) >= 15, extra
     copy_as(DOC / "业绩报酬" / "A02_业绩报酬条款.md", att / "报酬_A02_业绩报酬条款.md")
     copy_as(DOC / "业绩报酬" / "A04_计提口径与交付.md", att / "报酬_A04_计提口径与交付.md")
     fn = "报酬_MCP_QQQ日线.json"
@@ -312,10 +328,11 @@ def q25(r24):
         wr.writerow(["L3", LOTS[2][1], "2026-03-16", f"{unit_sub:.4f}", f"{u3:.2f}", "", "", f"申购金额 {SUB[1]:,.2f} 美元"])
         wr.writerow(["", "历史单位净值", "2025-10-31", f"{unit_1031:.4f}", "", "", "", "托管行复核确认"])
         wr.writerow(["", "历史单位净值", "2026-03-16", f"{unit_sub:.4f}", "", "", "", "托管行复核确认"])
-    # ---- 只用附件重算 ----
-    wb = load_workbook(att / "专户估值对账表.xlsx", data_only=True)
-    nav = next(r[1] for r in wb["净值汇总"].iter_rows(min_row=2, values_only=True) if r[0] == "资产净值")
-    nav_sys = next(r[2] for r in wb["净值汇总"].iter_rows(min_row=2, values_only=True) if r[0] == "资产净值")
+    # ---- 资产净值用 24 的正确结果，其余只用本题附件 ----
+    nav, nav_sys = r24["nav"], r24["nav_sys"]
+    wb = load_workbook(D24 / "标准答案附件" / "专户估值对账表.xlsx", data_only=True)
+    row = next(r for r in wb["净值汇总"].iter_rows(min_row=2, values_only=True) if r[0] == "资产净值")
+    assert (row[1], row[2]) == (nav, nav_sys)
     a01 = pd.read_csv(att / "报酬_A01_份额登记.csv", dtype=str)
     rec, q = load_mcp_prices(att / fn, 0)
     qadj = q.Close
@@ -342,6 +359,8 @@ def q25(r24):
         wr.writerow(["份额编号", "资产净值(美元)", "期末单位净值", "基准日", "基准单位净值", "基准收益率", "每份超额收益", "业绩报酬(美元)"])
         for x in res_s:
             wr.writerow([x["k"], f"{nav_sys:.2f}", f"{x['unit']:.4f}", x["bd"], f"{x['bu']:.4f}", pc(x["rb"]), f"{x['ex']:.4f}", f"{x['fee']:.2f}"])
+    a03 = pd.read_csv(att / "报酬_A03_管理人初算.csv", dtype=str)
+    assert set(a03["资产净值(美元)"]) == {f"{nav_sys:.2f}"}  # 管理人估值表的净值本轮附件里有，写差异原因用
     fee_tot = r2(sum(x["fee"] for x in res))
     ded_tot = r2(sum(x["ded"] for x in res))
     nav_after = r2(nav - fee_tot)
@@ -378,7 +397,7 @@ def q25(r24):
         ("和初算的差异", [f"管理人初算 {w2(fee_s)} 美元，比正确的{'多' if fee_s > fee_tot else '少'} {w2(abs(fee_s - fee_tot))} 美元。原因有两处：",
                        f"一是用了管理人估值表的资产净值 {w2(nav_sys)} 美元，没有用对账后的 {w2(nav)} 美元；",
                        "二是把 L2 的基准日挪到了 2025-10-31。L2 那天单位净值低于高水位，没有实际计提，按条款基准日仍是申购确认日 2025-02-10，高水位仍是 1.4100。"]),
-        ("数据", ["QQQ 通过 US Stocks MCP 查询，Close 是按分红调整后的价格，用来算含分红收益率；美股 Date 的日期部分就是交易日。"]),
+        ("数据", ["QQQ 日线通过 US Stocks MCP 查询（数据来自 Yahoo Finance，2026-11-19 查询），收盘价按分红调整过，用来算含分红收益率；日期按美股交易日。"]),
     ])
     return res
 

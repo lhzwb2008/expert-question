@@ -9,6 +9,8 @@ A02 快照收录十九只股票，中芯国际（688981.SS）留给在线 MCP �
 1. 生成 A01（持仓与目标权重）和 A02（收盘价快照）。
 2. 只用题目附件加中芯国际的 MCP 结果文件重算，生成标准答案附件。
 3. 检查小单门槛、三条限额离门槛的距离，并算一遍常见错误的结果。
+2026-11-26 最终质检返修：题目附件加了 16 份补充材料（_工具/补充材料/11/，见那里的生成脚本），标准答案不变；
+「汇总与限额」A 列放宽并换行（widen_summary_labels）。
 """
 from __future__ import annotations
 
@@ -17,7 +19,7 @@ import json
 from decimal import ROUND_FLOOR, ROUND_HALF_UP, Decimal as D
 from pathlib import Path
 
-from build_common import OUT, copy_as, fresh_dir, load_mcp_prices, source_line, write_docx, write_xlsx
+from build_common import OUT, copy_as, copy_materials, fresh_dir, load_mcp_prices, scrub_office, source_line, write_docx, write_xlsx
 
 HERE = Path(__file__).resolve().parent
 RAW = HERE / "新题数据" / "调仓指令"
@@ -113,6 +115,20 @@ def rebalance(hold: list[dict], price: dict[str, D]):
     return nav, rows, first, final, verdict
 
 
+def widen_summary_labels(path: Path) -> None:
+    """2026-11-26 最终质检：「汇总与限额」A12:A16 的指标名称被 B 列结果挡住。
+    共用 write_xlsx 按双宽估出的 A 列宽 24，在 11 号字下「限额一：单边换手率≤15%」约 178 像素，列只有约 173 像素，仍会截断。
+    这里把 A 列放宽到 34（约 243 像素），A 列标签再设自动换行，单元格内容不变。"""
+    from openpyxl import load_workbook
+    from openpyxl.styles import Alignment
+    wb = load_workbook(path)
+    ws = wb["汇总与限额"]
+    ws.column_dimensions["A"].width = 34
+    last = next(r for r in range(2, ws.max_row + 1) if ws.cell(r, 1).value == "结论")
+    for r in range(2, last + 1):
+        ws.cell(r, 1).alignment = Alignment(vertical="top", wrap_text=True)
+    wb.save(path)
+    scrub_office(path)
 def main() -> None:
     att = fresh_dir(DST / "题目附件")
     ans = fresh_dir(DST / "标准答案附件")
@@ -138,6 +154,9 @@ def main() -> None:
     for name in ["A03_调仓口径.md", "A04_限额与交付.md"]:
         copy_as(DOC / name, att / f"{PREFIX}{name}")
     copy_as(DST / "MCP结果文件" / MCP_FILE, att / MCP_FILE)
+    # 2026-11-26 最终质检返修补的背景、历史和版本材料（B01 至 B16），由 补充材料/11/生成补充材料.py 生成，这里原样复制
+    extra = copy_materials("11", att)
+    assert len(extra) == 16, extra
 
     # 2. 只用题目附件重算
     hold = list(csv.DictReader(open(att / f"{PREFIX}A01_持仓与目标权重.csv", encoding="utf-8")))
@@ -225,6 +244,7 @@ def main() -> None:
             ],
         },
     )
+    widen_summary_labels(ans / "A股调仓指令测算表.xlsx")
     write_docx(
         ans / "A股调仓指令复核意见.docx",
         "沪深股票多头组合四季度调仓指令复核意见",
@@ -245,8 +265,8 @@ def main() -> None:
                 f"单边换手率 {pc(final['turn'])}；调仓后现金 {final['cash']:,.2f} 元，占 {pc(final['cash_pct'])}；调仓后权重最高的是{name[final['top']]} {pc(final['top_w'], 4)}。三条限额都满足。",
             ]),
             ("在线数据", [
-                "研究部的收盘价快照 A02 没有收录中芯国际。它的日线通过 US Stocks MCP 查询，代码 688981.SS。返回的日期是 UTC 时间，加 8 小时后才是交易日；"
-                f"返回期间内没有分红和送转，收盘价就是实际收盘价。基准日 {BASE} 收盘 {smic} 元。",
+                f"研究部的收盘价快照 A02 没有收录中芯国际。它的日线通过 US Stocks MCP 查询（数据来自 Yahoo Finance，{rec['查询时间'][:10]} 查询），代码 688981.SS，日期按A股交易日归属；"
+                f"数据期间内没有分红和送转，收盘价就是实际收盘价。基准日 {BASE} 收盘 {smic} 元。",
             ]),
             ("对应材料", ["二十只股票的目标股数和调仓后权重见《A股调仓指令测算表.xlsx》的「持仓检查」，最终订单见「订单清单」，初始和最终两份清单的限额检查见「汇总与限额」，"
                       "中芯国际的收盘价见「在线数据」。两份文件的结论、订单笔数、买卖金额和补卖单相同。"]),

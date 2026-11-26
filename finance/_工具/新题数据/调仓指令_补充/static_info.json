@@ -1,0 +1,190 @@
+{
+ "查询时间": "2026-11-26 12:03:58",
+ "接口": "LongPort OpenAPI QuoteContext.static_info",
+ "参数": {
+  "symbols": [
+   "601318.SH",
+   "601166.SH",
+   "600900.SH",
+   "601398.SH",
+   "600030.SH",
+   "600276.SH",
+   "601899.SH",
+   "600309.SH",
+   "601012.SH",
+   "600887.SH",
+   "601888.SH",
+   "000333.SZ",
+   "000858.SZ",
+   "002594.SZ",
+   "000651.SZ",
+   "002415.SZ",
+   "300059.SZ",
+   "688981.SH",
+   "688041.SH",
+   "688111.SH"
+  ]
+ },
+ "返回": [
+  {
+   "symbol": "601318.SH",
+   "name_cn": "中国平安",
+   "lot_size": 100,
+   "currency": "CNY",
+   "total_shares": 18107641995,
+   "circulating_shares": 10660065083
+  },
+  {
+   "symbol": "601166.SH",
+   "name_cn": "兴业银行",
+   "lot_size": 100,
+   "currency": "CNY",
+   "total_shares": 21162864665,
+   "circulating_shares": 21162864665
+  },
+  {
+   "symbol": "600900.SH",
+   "name_cn": "长江电力",
+   "lot_size": 100,
+   "currency": "CNY",
+   "total_shares": 24468217716,
+   "circulating_shares": 24468217716
+  },
+  {
+   "symbol": "601398.SH",
+   "name_cn": "工商银行",
+   "lot_size": 100,
+   "currency": "CNY",
+   "total_shares": 356406257089,
+   "circulating_shares": 269612212539
+  },
+  {
+   "symbol": "600030.SH",
+   "name_cn": "中信证券",
+   "lot_size": 100,
+   "currency": "CNY",
+   "total_shares": 15624272212,
+   "circulating_shares": 12176550974
+  },
+  {
+   "symbol": "600276.SH",
+   "name_cn": "恒瑞医药",
+   "lot_size": 100,
+   "currency": "CNY",
+   "total_shares": 6637199874,
+   "circulating_shares": 6379002274
+  },
+  {
+   "symbol": "601899.SH",
+   "name_cn": "紫金矿业",
+   "lot_size": 100,
+   "currency": "CNY",
+   "total_shares": 26590798241,
+   "circulating_shares": 20601793140
+  },
+  {
+   "symbol": "600309.SH",
+   "name_cn": "万华化学",
+   "lot_size": 100,
+   "currency": "CNY",
+   "total_shares": 3130471626,
+   "circulating_shares": 3130471626
+  },
+  {
+   "symbol": "601012.SH",
+   "name_cn": "隆基绿能",
+   "lot_size": 100,
+   "currency": "CNY",
+   "total_shares": 7578069833,
+   "circulating_shares": 7578062287
+  },
+  {
+   "symbol": "600887.SH",
+   "name_cn": "伊利股份",
+   "lot_size": 100,
+   "currency": "CNY",
+   "total_shares": 6325360667,
+   "circulating_shares": 6293929721
+  },
+  {
+   "symbol": "601888.SH",
+   "name_cn": "中国中免",
+   "lot_size": 100,
+   "currency": "CNY",
+   "total_shares": 2077796644,
+   "circulating_shares": 1952475544
+  },
+  {
+   "symbol": "000333.SZ",
+   "name_cn": "美的集团",
+   "lot_size": 100,
+   "currency": "CNY",
+   "total_shares": 7630380988,
+   "circulating_shares": 6977293244
+  },
+  {
+   "symbol": "000858.SZ",
+   "name_cn": "五粮液",
+   "lot_size": 100,
+   "currency": "CNY",
+   "total_shares": 3881608005,
+   "circulating_shares": 3881608005
+  },
+  {
+   "symbol": "002594.SZ",
+   "name_cn": "比亚迪",
+   "lot_size": 100,
+   "currency": "CNY",
+   "total_shares": 9117197565,
+   "circulating_shares": 5433797565
+  },
+  {
+   "symbol": "000651.SZ",
+   "name_cn": "格力电器",
+   "lot_size": 100,
+   "currency": "CNY",
+   "total_shares": 5601405741,
+   "circulating_shares": 5601405741
+  },
+  {
+   "symbol": "002415.SZ",
+   "name_cn": "海康威视",
+   "lot_size": 100,
+   "currency": "CNY",
+   "total_shares": 9164871550,
+   "circulating_shares": 9164871550
+  },
+  {
+   "symbol": "300059.SZ",
+   "name_cn": "东方财富",
+   "lot_size": 100,
+   "currency": "CNY",
+   "total_shares": 15822199875,
+   "circulating_shares": 15822199875
+  },
+  {
+   "symbol": "688981.SH",
+   "name_cn": "中芯国际",
+   "lot_size": 100,
+   "currency": "CNY",
+   "total_shares": 8562439270,
+   "circulating_shares": 2000593909
+  },
+  {
+   "symbol": "688041.SH",
+   "name_cn": "海光信息",
+   "lot_size": 100,
+   "currency": "CNY",
+   "total_shares": 2323817966,
+   "circulating_shares": 2323817966
+  },
+  {
+   "symbol": "688111.SH",
+   "name_cn": "金山办公",
+   "lot_size": 100,
+   "currency": "CNY",
+   "total_shares": 464013435,
+   "circulating_shares": 464013435
+  }
+ ]
+}

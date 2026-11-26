@@ -166,7 +166,7 @@ def main() -> None:
                 f"POV 为 {row['POV'].mean_vs_arrival_bp:.2f} bp，AM 为 {row['AM'].mean_vs_arrival_bp:.2f} bp，只作参考。",
             ]),
             ("分钟行情核对", [
-                f"用 US Stocks MCP 查询了招商银行（600036.SS）的日线，和 A01 逐日比对。{D_FROM} 至 {D_TO} 实际有 {len(daily)} 个交易日，"
+                f"通过 US Stocks MCP 查询招商银行（600036.SS）日线（数据来自 Yahoo Finance，{rec['查询时间'][:10]} 查询），和 A01 逐日比对。{D_FROM} 至 {D_TO} 实际有 {len(daily)} 个交易日，"
                 f"A01 只有 {len(minute)} 个，缺 {miss} 这一天，当天日线成交量 {miss_vol:,} 股。A02 写的 81 个交易日是 A01 里的天数。",
                 f"缺失日在前 20 天的预热期里，没有补。成交量分布取 A01 里此前有分钟数据的 20 个交易日，"
                 f"所以 {'、'.join(h[0] for h in hit)} 这三天的分布窗口各往前多取了一天，只影响 VWAP 算法在这三天的计划量。评估区间仍是 61 天。",

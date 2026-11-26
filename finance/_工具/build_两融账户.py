@@ -16,7 +16,7 @@ from pathlib import Path
 import pandas as pd
 from openpyxl import load_workbook
 
-from build_common import OUT, copy_as, fresh_dir, load_mcp_prices, source_line, write_docx, write_xlsx
+from build_common import OUT, copy_as, copy_materials, fresh_dir, load_mcp_prices, source_line, write_docx, write_xlsx
 
 HERE = Path(__file__).resolve().parent
 RAW = HERE / "新题数据"
@@ -261,6 +261,7 @@ def q26():
     rn = RN["2026-10-23"]
     mail = mail.format(mv=f"{w2(rn['mv'])} 元", cash=f"{w2(rn['cash'])} 元", debt=f"{w2(rn['prin'])} 元", ratio=pc(rn["ratio"]))
     (att / "回放_A08_投资经理邮件.md").write_text(mail, encoding="utf-8")
+    mats26 = copy_materials("26", att)
 
     # 检查：故事成立，且离门槛有距离
     r = lambda d: R[d]["ratio"]
@@ -351,6 +352,7 @@ def q26():
     print(f"[26] 比例 " + " ".join(f"{d[5:]}:{r(d) * 100:.2f}" for d in ["2026-09-30"] + days))
     print(f"     不计利息 10-23 {RN['2026-10-23']['ratio'] * 100:.2f}；强平前 {fp['r_before'] * 100:.2f} 现金还款后 {fp['r_cash'] * 100:.2f} 应卖 {fp['need']}")
     print(f"     超额 {extra} 损失 {loss}；月末 {rat_e * 100:.2f}% 现金 {acc.cash} 本金 {acc.principal} 利息 {acc.intr} 持仓 {acc.pos}")
+    print(f"     题目附件 {len(list(att.iterdir()))} 份（含补充材料 {len(mats26)} 份）")
     return dict(acc=acc, px=px, rat=rat_e, loss=loss, R=R, fp=fp)
 
 
@@ -379,7 +381,8 @@ def lots(code: str, room: int):
 def q27(r26):
     att, ans = fresh_dir(D27 / "题目附件"), fresh_dir(D27 / "标准答案附件")
     fresh_dir(D27 / "MCP结果文件")
-    copy_as(D26 / "标准答案附件" / "两融账户10月回放复核表.xlsx", att / "两融账户10月回放复核表.xlsx")
+    # 前轮标答《两融账户10月回放复核表.xlsx》不再放进本题题目附件（最终质检要求后轮接收模型自己完成的前轮成果）。
+    # 本题标答仍按正确的前轮结果计算：持股数和板块直接读 26 的标准答案附件，不复制进 27 的题目附件。
     copy_as(DOC / "两融降杠杆" / "A01_投委会降杠杆决议.md", att / "降杠杆_A01_投委会降杠杆决议.md")
     mcps = {}
     for k in NAME:
@@ -406,8 +409,10 @@ def q27(r26):
         wr.writerow(["现金余额", "", "", "0.00", ""])
         wr.writerow(["直接还款", "", "", f"{cash:.2f}", f"11-02 客户发起，先还应付利息 {pay_i:.2f}，再还 " + "，".join(f"{x} 本金 {y:.2f}" for x, y in parts)])
 
-    # ---- 只用附件重算 ----
-    pos0, board = read_q26(att / "两融账户10月回放复核表.xlsx")
+    mats27 = copy_materials("27", att)
+
+    # ---- 标答按正确的前轮结果计算：持股数和板块读 26 标准答案附件的「10月末状态」 ----
+    pos0, board = read_q26(D26 / "标准答案附件" / "两融账户10月回放复核表.xlsx")
     st = pd.read_csv(att / "降杠杆_A02_华东证券11月2日对账单.csv", dtype=str)
     debt0 = r2(sum(float(x) for x in st[st["项目"].isin(["融资合约", "应付融资利息"])]["2026-11-02日终金额(元)"]))
     cash0 = float(st[st["项目"] == "现金余额"]["2026-11-02日终金额(元)"].iloc[0])
@@ -499,6 +504,7 @@ def q27(r26):
         print(f"     {o['step']} {NAME[o['code']]} {o['qty']} 成交 {o['amt']} 费用 {o['fee']} 净额 {o['net']} 负债 {o['debt']} "
               f"集中度 {o['conc'] * 100:.3f}% 比例 {o['ratio'] * 100:.3f}% 压力 {o['stress'] * 100:.3f}%")
     print(f"     执行后 持仓 {s['pos']} 负债 {s['debt']} 占比 { {NAME[k]: round(v * 100, 2) for k, v in conc(s).items()} } 上限 {capped}")
+    print(f"     题目附件 {len(list(att.iterdir()))} 份（含补充材料 {len(mats27)} 份，不含前轮标答）")
     # 错法
     print(f"     错法：创业板按 10% 封顶，宁德压力跌幅 10.00%；分母 n 时宁德 σ {float(recs['300750'][1].Close.round(2)[:EXE].tail(21).pct_change().dropna().std(ddof=0)) * 100:.4f}%")
     assert capped == ["300750"] and STRESS - start["stress"] > 0.2

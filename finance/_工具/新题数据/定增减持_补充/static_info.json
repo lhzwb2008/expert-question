@@ -1,0 +1,55 @@
+{
+ "查询时间": "2026-11-26 12:31:35",
+ "接口": "LongPort OpenAPI QuoteContext.static_info",
+ "参数": {
+  "symbols": [
+   "002371.SZ",
+   "688012.SH",
+   "603986.SH",
+   "002049.SZ",
+   "600584.SH"
+  ]
+ },
+ "返回": [
+  {
+   "symbol": "002371.SZ",
+   "name_cn": "北方华创",
+   "lot_size": 100,
+   "currency": "CNY",
+   "total_shares": 727953799,
+   "circulating_shares": 727953799
+  },
+  {
+   "symbol": "688012.SH",
+   "name_cn": "中微公司",
+   "lot_size": 100,
+   "currency": "CNY",
+   "total_shares": 957842348,
+   "circulating_shares": 942197038
+  },
+  {
+   "symbol": "603986.SH",
+   "name_cn": "兆易创新",
+   "lot_size": 100,
+   "currency": "CNY",
+   "total_shares": 703971427,
+   "circulating_shares": 670718327
+  },
+  {
+   "symbol": "002049.SZ",
+   "name_cn": "紫光国微",
+   "lot_size": 100,
+   "currency": "CNY",
+   "total_shares": 843233778,
+   "circulating_shares": 843233778
+  },
+  {
+   "symbol": "600584.SH",
+   "name_cn": "长电科技",
+   "lot_size": 100,
+   "currency": "CNY",
+   "total_shares": 1789414570,
+   "circulating_shares": 1789414570
+  }
+ ]
+}
